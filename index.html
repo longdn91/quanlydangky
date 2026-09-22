@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Đăng Ký Môn Học - Kết Nối Google Sheet</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- SheetJS CDN for Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        [v-cloak] { display: none !important; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+    <div id="app" v-cloak class="flex-grow flex flex-col relative">
+
+        <!-- GLOBAL LOADING OVERLAY -->
+        <div v-if="loading" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex flex-col items-center justify-center p-4 transition-all">
+            <div class="bg-white p-6 rounded-2xl shadow-2xl text-slate-800 flex flex-col items-center max-w-sm w-full text-center border border-slate-100">
+                <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                <h3 class="font-bold text-base text-slate-800 mb-1">Đang tải dữ liệu Google Sheet</h3>
+                <p class="text-xs text-slate-500">Vui lòng chờ trong giây lát, hệ thống đang đồng bộ danh sách học sinh, môn học và đăng ký...</p>
+            </div>
+        </div>
+
+        <!-- HEADER BAR -->
+        <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 p-2 rounded-lg text-white">
+                        <i class="fa-solid fa-graduation-cap text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight">Đăng Ký Môn Học</h1>
+                        <p class="text-xs text-slate-400">Hệ thống đồng bộ dữ liệu tự động</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <!-- Status Badge -->
+                    <div class="flex items-center space-x-2 text-xs px-3 py-1.5 rounded-full border transition-all"
+                        :class="sheetId ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300' : 'bg-amber-950/60 border-amber-500 text-amber-300'">
+                        <span class="w-2 h-2 rounded-full" :class="sheetId ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"></span>
+                        <span class="font-medium hidden sm:inline">{{ sheetId ? 'Đã kết nối Sheet' : 'Chưa gắn Sheet' }}</span>
+                        <i class="fa-solid fa-link text-xs"></i>
+                    </div>
+
+                    <!-- Role Switcher -->
+                    <div class="bg-slate-800 p-1 rounded-lg flex border border-slate-700 text-xs">
+                        <button @click="currentRole = 'teacher'"
+                            :class="currentRole === 'teacher' ? 'bg-indigo-600 text-white font-semibold shadow' : 'text-slate-400 hover:text-slate-200'"
+                            class="px-3 py-1 rounded-md transition-all flex items-center space-x-1">
+                            <i class="fa-solid fa-chalkboard-user"></i>
+                            <span>GV Chủ Nhiệm</span>
+                        </button>
+                        <button @click="currentRole = 'admin'"
+                            :class="currentRole === 'admin' ? 'bg-purple-600 text-white font-semibold shadow' : 'text-slate-400 hover:text-slate-200'"
+                            class="px-3 py-1 rounded-md transition-all flex items-center space-x-1">
+                            <i class="fa-solid fa-user-gear"></i>
+                            <span>Quản Trị</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Toast Notification -->
+        <div v-if="toast.show" class="fixed top-20 right-4 z-50 max-w-sm w-full bg-white rounded-xl shadow-2xl border p-4 transition-all transform duration-300"
+            :class="toast.type === 'error' ? 'border-red-500 text-red-700' : (toast.type === 'success' ? 'border-emerald-500 text-emerald-700' : 'border-indigo-500 text-indigo-700')">
+            <div class="flex items-start space-x-3">
+                <i :class="toast.type === 'error' ? 'fa-solid fa-circle-exclamation text-red-500 text-lg' : (toast.type === 'success' ? 'fa-solid fa-circle-check text-emerald-500 text-lg' : 'fa-solid fa-circle-info text-indigo-500 text-lg')"></i>
+                <div class="flex-1">
+                    <p class="text-sm font-semibold">{{ toast.title }}</p>
+                    <p class="text-xs mt-0.5 opacity-90">{{ toast.message }}</p>
+                </div>
+                <button @click="toast.show = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+
+        <!-- MAIN CONTAINER -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+            <!-- VIEW 1: GIÁO VIÊN CHỦ NHIỆM -->
+            <div v-if="currentRole === 'teacher'" class="space-y-6">
+
+                <!-- Save Action Header Bar for Teacher -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                            <i class="fa-solid fa-clipboard-user"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-800">Cổng Đăng Ký Dành Cho Giáo Viên</h2>
+                            <p class="text-xs text-slate-500">
+                                Tổng số: <strong class="text-slate-700">{{ students.length }}</strong> học sinh | 
+                                <strong class="text-slate-700">{{ activeSubjects.length }}</strong> môn khả dụng | 
+                                <strong class="text-indigo-600">{{ totalRegistrationsCount }}</strong> lượt đăng ký
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2 w-full sm:w-auto">
+                        <button @click="loadDataFromSheetUrl" :disabled="loading"
+                            class="w-full sm:w-auto px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center space-x-1.5 shrink-0" title="Tải lại từ Google Sheet">
+                            <i :class="loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-arrows-rotate'"></i>
+                            <span>Tải lại dữ liệu</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Diagnostic Alert for Unmatched or Hidden Registrations -->
+                <div v-if="hiddenOrUnknownRegistrationsCount > 0" class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-xs flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm"></i>
+                        <span>Phát hiện <strong>{{ hiddenOrUnknownRegistrationsCount }}</strong> đăng ký thuộc môn học bị Ẩn hoặc mã môn không hợp lệ. Quản trị viên có thể kiểm tra ở tab Quản Trị.</span>
+                    </div>
+                </div>
+
+                <!-- Filter & Controls Toolbar -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+
+                        <!-- Select Class (Đã làm nổi bật) -->
+                        <div class="md:col-span-3 bg-indigo-50/80 p-3 rounded-xl border-2 border-indigo-400 shadow-sm relative">
+                            <label class="block text-xs font-extrabold text-indigo-900 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                                <span class="flex items-center space-x-1.5">
+                                    <i class="fa-solid fa-filter text-indigo-600"></i>
+                                    <span>CHỌN LỚP</span>
+                                </span>
+                                <span class="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">Nổi bật</span>
+                            </label>
+                            <select v-model="selectedClass" class="w-full bg-white border-2 border-indigo-500 rounded-lg px-3 py-2 text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-600 focus:outline-none shadow-sm cursor-pointer">
+                                <option value="" class="font-medium text-slate-700">-- Tất cả các lớp ({{ uniqueClasses.length }}) --</option>
+                                <option v-for="c in uniqueClasses" :key="c" :value="c" class="font-bold text-indigo-900">Lớp {{ c }}</option>
+                            </select>
+                        </div>
+
+                        <!-- Search Student -->
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                Tìm kiếm học sinh
+                            </label>
+                            <div class="relative">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+                                <input type="text" v-model="searchQuery" placeholder="Nhập mã hoặc tên học sinh..."
+                                    class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none">
+                            </div>
+                        </div>
+
+                        <!-- Filter Subject -->
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                Lọc theo Môn Học
+                            </label>
+                            <select v-model="selectedSubjectFilter" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none">
+                                <option value="">-- Tất cả môn học --</option>
+                                <option value="unregistered">-- Chưa đăng ký môn nào --</option>
+                                <option v-for="sub in activeSubjects" :key="sub.id" :value="sub.id">{{ sub.name }} ({{ sub.id }})</option>
+                            </select>
+                        </div>
+
+                        <!-- Reset Filter -->
+                        <div class="md:col-span-2 flex items-end">
+                            <button @click="resetFilters" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-all">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> Đặt lại
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subjects Selection Grid -->
+                <div>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-2">
+                            <i class="fa-solid fa-book-bookmark text-indigo-600"></i>
+                            <span>Danh Sách Môn Học Khả Dụng ({{ displayedSubjects.length }}/{{ activeSubjects.length }})</span>
+                            <span v-if="selectedClass" class="text-xs normal-case font-normal text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                                Lớp {{ selectedClass }}
+                            </span>
+                        </h2>
+                        
+                        <div class="flex items-center space-x-3">
+                            <!-- Toggle Hide 0-student Subjects -->
+                            <label class="flex items-center space-x-1.5 text-xs text-slate-700 font-medium cursor-pointer bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 transition-all select-none">
+                                <input type="checkbox" v-model="hideEmptySubjects" class="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5">
+                                <span>Ẩn môn không có HS</span>
+                            </label>
+                            <span class="text-xs text-slate-500 hidden sm:inline">Chọn HS bên dưới rồi bấm gán môn</span>
+                        </div>
+                    </div>
+
+                    <div v-if="displayedSubjects.length === 0" class="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center text-amber-800 text-sm">
+                        <span v-if="activeSubjects.length === 0">Chưa có môn học khả dụng nào. Vui lòng chuyển sang tab <strong>Quản Trị</strong> để mở hoặc thêm môn học.</span>
+                        <span v-else>Không có môn học nào có học sinh đăng ký trong bộ lọc hiện tại. <br><button @click="hideEmptySubjects = false" class="text-indigo-600 font-semibold hover:underline mt-1">Bỏ tích "Ẩn môn không có HS"</button> để xem tất cả môn.</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        <div v-for="sub in displayedSubjects" :key="sub.id"
+                            class="bg-white border rounded-xl p-3 shadow-sm hover:shadow-md transition-all relative group flex flex-col justify-between"
+                            :class="selectedBulkSubjectId === sub.id ? 'border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/30' : 'border-slate-200'">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">{{ sub.id }}</span>
+                                    <span class="text-[11px] font-semibold" :class="getRegisteredCountForSubject(sub.id) > 0 ? 'text-indigo-600' : 'text-slate-400'">
+                                        {{ getRegisteredCountForSubject(sub.id) }} HS
+                                    </span>
+                                </div>
+                                <h3 class="font-bold text-slate-800 text-xs line-clamp-2 mt-1">{{ sub.name }}</h3>
+                            </div>
+
+                            <button @click="applyBulkSubject(sub.id)" :disabled="selectedStudentIds.length === 0"
+                                class="mt-2 w-full py-1 text-[11px] font-semibold rounded-lg transition-all flex items-center justify-center space-x-1"
+                                :class="selectedStudentIds.length > 0 ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-400 cursor-not-allowed'">
+                                <i class="fa-solid fa-plus text-[10px]"></i>
+                                <span>Gán cho {{ selectedStudentIds.length }} HS</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Table Section -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center space-x-3">
+                            <label class="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                                <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                                <span>Chọn tất cả ({{ filteredStudents.length }})</span>
+                            </label>
+                            <span v-if="selectedStudentIds.length > 0" class="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2.5 py-0.5 rounded-full">
+                                Đã chọn {{ selectedStudentIds.length }} học sinh
+                            </span>
+                        </div>
+
+                        <div class="flex items-center justify-between sm:justify-end space-x-3 w-full sm:w-auto">
+                            <span class="text-xs text-slate-500 hidden sm:inline">Hiển thị {{ filteredStudents.length }} / {{ students.length }} học sinh</span>
+                            <button @click="saveAllData" :disabled="saving"
+                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center space-x-2 disabled:opacity-50">
+                                <i v-if="saving" class="fa-solid fa-spinner fa-spin"></i>
+                                <i v-else class="fa-solid fa-floppy-disk"></i>
+                                <span>Lưu đăng ký</span>
+                            </button>
+                            <!-- Nút Xuất Excel bên phải nút Lưu Đăng Ký -->
+                            <button @click="exportToExcel"
+                                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center space-x-2">
+                                <i class="fa-solid fa-file-excel"></i>
+                                <span>Xuất Excel</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                    <th class="py-3 px-4 w-10 text-center">
+                                        <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer" title="Chọn tất cả">
+                                    </th>
+                                    <th class="py-3 px-4 w-14 text-center">STT</th>
+                                    <th class="py-3 px-4 min-w-[180px]">Họ Và Tên</th>
+                                    <th class="py-3 px-4 w-24">Lớp</th>
+                                    <th class="py-3 px-4 min-w-[280px]">Môn Đã Đăng Ký</th>
+                                    <th class="py-3 px-4 w-28 text-center">Thao Tác</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-xs">
+                                <tr v-if="filteredStudents.length === 0">
+                                    <td colspan="6" class="py-8 text-center text-slate-400">
+                                        <i class="fa-solid fa-user-slash text-2xl mb-2 block"></i>
+                                        <span v-if="students.length === 0">Chưa có dữ liệu học sinh. Vui lòng tải dữ liệu từ Google Sheet.</span>
+                                        <span v-else>Không tìm thấy học sinh phù hợp với bộ lọc.</span>
+                                    </td>
+                                </tr>
+                                <tr v-for="(st, idx) in filteredStudents" :key="st.id"
+                                    class="hover:bg-slate-50/80 transition-all"
+                                    :class="selectedStudentIds.includes(st.id) ? 'bg-indigo-50/30' : ''">
+                                    <td class="py-3 px-4 text-center">
+                                        <input type="checkbox" :value="st.id" v-model="selectedStudentIds" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+                                    </td>
+                                    <td class="py-3 px-4 text-center font-semibold text-slate-500">{{ idx + 1 }}</td>
+                                    <td class="py-3 px-4 font-semibold text-slate-800">{{ st.name }}</td>
+                                    <td class="py-3 px-4">
+                                        <span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md text-[11px] font-medium">{{ st.class }}</span>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <!-- Registered Subject Chips -->
+                                        <div class="flex flex-wrap gap-1.5">
+                                            <span v-for="subId in getStudentRegistrations(st.id)" :key="subId"
+                                                class="inline-flex items-center space-x-1 border px-2 py-0.5 rounded-md text-[11px] font-medium"
+                                                :class="getSubjectStatusClass(subId)">
+                                                <span>{{ getSubjectDisplayName(subId) }}</span>
+                                                <button @click="removeSubjectFromStudent(st.id, subId)" class="hover:text-red-600 ml-1 text-[10px]" title="Xóa môn này">
+                                                    <i class="fa-solid fa-xmark"></i>
+                                                </button>
+                                            </span>
+                                            <span v-if="getStudentRegistrations(st.id).length === 0" class="text-slate-400 italic text-[11px]">
+                                                Chưa đăng ký
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-center">
+                                        <!-- Khi có từ 1-3 môn khả dụng: Hiển thị trực tiếp các nút đăng ký theo tên môn -->
+                                        <div v-if="activeSubjects.length >= 1 && activeSubjects.length <= 3" class="flex flex-wrap items-center justify-center gap-1.5">
+                                            <button v-for="sub in activeSubjects" :key="sub.id"
+                                                @click="toggleSubjectForStudent(st.id, sub.id)"
+                                                class="px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center space-x-1"
+                                                :class="isSubjectRegistered(st.id, sub.id) 
+                                                    ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700' 
+                                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'">
+                                                <i :class="isSubjectRegistered(st.id, sub.id) ? 'fa-solid fa-circle-check text-[10px]' : 'fa-solid fa-plus text-[10px]'"></i>
+                                                <span>{{ sub.name }}</span>
+                                            </button>
+                                        </div>
+                                        <!-- Khi có nhiều hơn 3 môn hoặc 0 môn: Hiển thị nút Chọn môn mặc định -->
+                                        <button v-else @click="openStudentRegisterModal(st)"
+                                            class="px-2.5 py-1 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700 rounded-lg text-xs font-medium transition-all">
+                                            <i class="fa-solid fa-pen-to-square mr-1"></i> Chọn môn
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: QUẢN TRỊ VIÊN -->
+            <div v-if="currentRole === 'admin'" class="space-y-6">
+
+                <!-- Admin Navigation Tabs -->
+                <div class="flex border-b border-slate-200 space-x-6 text-sm font-semibold overflow-x-auto">
+                    <button @click="adminTab = 'config'"
+                        :class="adminTab === 'config' ? 'border-b-2 border-purple-600 text-purple-600' : 'text-slate-500 hover:text-slate-800'"
+                        class="pb-3 transition-all flex items-center space-x-2 shrink-0">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>Kết Nối Google Sheet</span>
+                    </button>
+                    <button @click="adminTab = 'subjects'"
+                        :class="adminTab === 'subjects' ? 'border-b-2 border-purple-600 text-purple-600' : 'text-slate-500 hover:text-slate-800'"
+                        class="pb-3 transition-all flex items-center space-x-2 shrink-0">
+                        <i class="fa-solid fa-book"></i>
+                        <span>Quản Lý Môn Học ({{ subjects.length }})</span>
+                    </button>
+                    <button @click="adminTab = 'students'"
+                        :class="adminTab === 'students' ? 'border-b-2 border-purple-600 text-purple-600' : 'text-slate-500 hover:text-slate-800'"
+                        class="pb-3 transition-all flex items-center space-x-2 shrink-0">
+                        <i class="fa-solid fa-user-graduate"></i>
+                        <span>Quản Lý Học Sinh ({{ students.length }})</span>
+                    </button>
+                    <button @click="adminTab = 'stats'"
+                        :class="adminTab === 'stats' ? 'border-b-2 border-purple-600 text-purple-600' : 'text-slate-500 hover:text-slate-800'"
+                        class="pb-3 transition-all flex items-center space-x-2 shrink-0">
+                        <i class="fa-solid fa-chart-column"></i>
+                        <span>Thống Kê Theo Lớp</span>
+                    </button>
+                </div>
+
+                <!-- SUB TAB 1: GOOGLE SHEET CONFIGURATION -->
+                <div v-if="adminTab === 'config'" class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <div class="flex items-center space-x-3 mb-4 pb-4 border-b border-slate-100">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                                <i class="fa-solid fa-file-excel text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-base">Cấu Hình Liên Kết Google Sheet</h3>
+                                <p class="text-xs text-slate-500">Quản lý nguồn dữ liệu học sinh, môn học và đăng ký</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-5">
+                            <!-- 1. Google Sheet Link -->
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                    1. Đường Dẫn File Google Sheet (Đọc Dữ Liệu)
+                                </label>
+                                <div class="flex flex-col sm:flex-row gap-2">
+                                    <input type="text" v-model="sheetUrlInput" placeholder="Dán link Google Sheet vào đây (VD: https://docs.google.com/spreadsheets/d/...)"
+                                        class="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all">
+                                    <button @click="loadDataFromSheetUrl" :disabled="loading"
+                                        class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2 disabled:opacity-50 shrink-0">
+                                        <i v-if="loading" class="fa-solid fa-spinner fa-spin"></i>
+                                        <i v-else class="fa-solid fa-cloud-arrow-down"></i>
+                                        <span>Tải Dữ Liệu Ngay</span>
+                                    </button>
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-1.5 flex items-center space-x-1">
+                                    <i class="fa-solid fa-circle-info text-emerald-600"></i>
+                                    <span>Yêu cầu file Google Sheet đặt quyền chia sẻ: <strong>"Bất kỳ ai có liên kết đều có thể xem"</strong>.</span>
+                                </p>
+                            </div>
+
+                            <!-- 2. Apps Script Web App Link -->
+                            <div class="pt-4 border-t border-slate-100">
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                    2. URL Google Apps Script Web App (Đồng Bộ Lưu 2 Chiều)
+                                </label>
+                                <div class="flex flex-col sm:flex-row gap-2">
+                                    <input type="text" v-model="gasUrlInput" placeholder="VD: https://script.google.com/macros/s/.../exec"
+                                        class="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all">
+                                    <button @click="saveAndLoadSheetConfig" :disabled="loading"
+                                        class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2 shrink-0">
+                                        <i class="fa-solid fa-floppy-disk"></i>
+                                        <span>Lưu Cấu Hình</span>
+                                    </button>
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-1.5">
+                                    Cho phép hệ thống ghi trực tiếp các thay đổi môn đăng ký ngược về Google Sheet.
+                                </p>
+                            </div>
+
+                            <!-- Quick Stats & Actions -->
+                            <div class="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                                <div class="flex items-center space-x-4 text-xs text-slate-600 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200">
+                                    <span>Trạng thái: <strong :class="sheetId ? 'text-emerald-600' : 'text-amber-600'">{{ sheetId ? 'Đã kết nối' : 'Chưa kết nối' }}</strong></span>
+                                    <span>|</span>
+                                    <span>Học sinh: <strong class="text-slate-800">{{ students.length }}</strong></span>
+                                    <span>|</span>
+                                    <span>Môn học: <strong class="text-slate-800">{{ subjects.length }}</strong></span>
+                                </div>
+
+                                <div class="flex items-center space-x-2">
+                                    <button @click="saveAllData" :disabled="saving"
+                                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center space-x-2 disabled:opacity-50">
+                                        <i v-if="saving" class="fa-solid fa-spinner fa-spin"></i>
+                                        <i v-else class="fa-solid fa-rotate"></i>
+                                        <span>Đồng bộ thủ công về Sheet</span>
+                                    </button>
+
+                                    <button @click="showInstructionsModal = true" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center space-x-1">
+                                        <i class="fa-solid fa-circle-question text-purple-600"></i>
+                                        <span>Xem Hướng Dẫn & Code Apps Script</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB TAB 2: SUBJECTS MANAGEMENT -->
+                <div v-if="adminTab === 'subjects'" class="grid grid-cols-1 md:grid-cols-12 gap-6">
+
+                    <!-- Form Add Subject -->
+                    <div class="md:col-span-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 h-fit">
+                        <h3 class="font-bold text-slate-800 text-sm mb-4 flex items-center space-x-2">
+                            <i class="fa-solid fa-circle-plus text-purple-600"></i>
+                            <span>{{ editingSubject ? 'Sửa Môn Học' : 'Thêm Môn Học Mới' }}</span>
+                        </h3>
+
+                        <form @submit.prevent="saveSubject" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Mã Môn Học</label>
+                                <input type="text" v-model="subjectForm.id" :disabled="!!editingSubject" placeholder="VD: VL10, HH10, TH10..."
+                                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none disabled:opacity-60 font-mono">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Tên Môn Học</label>
+                                <input type="text" v-model="subjectForm.name" placeholder="VD: Vật Lý 10, Hóa Học 10..."
+                                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                            </div>
+
+                            <div class="flex items-center space-x-2 pt-1">
+                                <label class="flex items-center space-x-2 text-xs font-medium text-slate-700 cursor-pointer">
+                                    <input type="checkbox" v-model="subjectForm.isHidden" class="rounded text-purple-600 focus:ring-purple-500 w-4 h-4">
+                                    <span>Ẩn môn học này đối với GVCN</span>
+                                </label>
+                            </div>
+
+                            <div class="flex space-x-2 pt-2">
+                                <button type="submit" class="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all">
+                                    {{ editingSubject ? 'Cập Nhật' : 'Thêm Môn Học' }}
+                                </button>
+                                <button v-if="editingSubject" type="button" @click="cancelSubjectEdit" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-all">
+                                    Hủy
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Subjects Table -->
+                    <div class="md:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-700 uppercase">Danh sách môn học</span>
+                            <span class="text-xs text-slate-500">Cấu trúc sheet `MonHoc`: `id`, `name`, `is_hidden`</span>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100/60 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                                        <th class="py-3 px-4 w-12 text-center">STT</th>
+                                        <th class="py-3 px-4 w-28">Mã Môn</th>
+                                        <th class="py-3 px-4">Tên Môn Học</th>
+                                        <th class="py-3 px-4 w-28 text-center">Trạng Thái</th>
+                                        <th class="py-3 px-4 w-24 text-center">Số HS Chọn</th>
+                                        <th class="py-3 px-4 w-28 text-center">Thao Tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-xs">
+                                    <tr v-if="subjects.length === 0">
+                                        <td colspan="6" class="py-6 text-center text-slate-400">Chưa có dữ liệu môn học.</td>
+                                    </tr>
+                                    <tr v-for="(sub, i) in subjects" :key="sub.id" class="hover:bg-slate-50" :class="sub.isHidden ? 'bg-slate-50/60' : ''">
+                                        <td class="py-3 px-4 text-center text-slate-400 font-semibold">{{ i + 1 }}</td>
+                                        <td class="py-3 px-4 font-mono font-bold text-purple-700">{{ sub.id }}</td>
+                                        <td class="py-3 px-4 font-medium" :class="sub.isHidden ? 'text-slate-400 line-through' : 'text-slate-800'">
+                                            {{ sub.name }}
+                                        </td>
+                                        <td class="py-3 px-4 text-center">
+                                            <span v-if="sub.isHidden" class="bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-md text-[10px] font-semibold">
+                                                <i class="fa-solid fa-eye-slash mr-1"></i>Đã Ẩn
+                                            </span>
+                                            <span v-else class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-md text-[10px] font-semibold">
+                                                <i class="fa-solid fa-eye mr-1"></i>Hiển Thị
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-center">
+                                            <span class="bg-purple-50 text-purple-700 font-semibold px-2 py-0.5 rounded-full text-[11px]">
+                                                {{ getRegisteredCountForSubject(sub.id) }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-center space-x-2">
+                                            <button @click="toggleSubjectVisibility(sub)"
+                                                :title="sub.isHidden ? 'Hiện môn học' : 'Ẩn môn học'"
+                                                :class="sub.isHidden ? 'text-emerald-600 hover:text-emerald-800' : 'text-amber-600 hover:text-amber-800'">
+                                                <i :class="sub.isHidden ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'"></i>
+                                            </button>
+                                            <button @click="editSubject(sub)" class="text-slate-500 hover:text-purple-600" title="Sửa môn"><i class="fa-solid fa-pen"></i></button>
+                                            <button @click="deleteSubject(sub.id)" class="text-slate-500 hover:text-red-600" title="Xóa môn"><i class="fa-solid fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB TAB 3: STUDENTS MANAGEMENT -->
+                <div v-if="adminTab === 'students'" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm">Danh Sách Học Sinh & Đăng Ký Tổng Hợp</h3>
+                            <p class="text-xs text-slate-500">Hiển thị toàn bộ dữ liệu khớp từ sheet `HocSinh` và `DangKy`</p>
+                        </div>
+                        <span class="text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-lg">
+                            Tổng: {{ students.length }} học sinh
+                        </span>
+                    </div>
+
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                                    <th class="py-3 px-4 w-14 text-center">STT</th>
+                                    <th class="py-3 px-4">Họ Và Tên</th>
+                                    <th class="py-3 px-4">Lớp</th>
+                                    <th class="py-3 px-4">Môn Đã Đăng Ký (Gồm cả môn ẩn)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-xs">
+                                <tr v-for="(st, idx) in students" :key="st.id" class="hover:bg-slate-50">
+                                    <td class="py-3 px-4 text-center font-semibold text-slate-500">{{ idx + 1 }}</td>
+                                    <td class="py-3 px-4 font-medium text-slate-800">{{ st.name }}</td>
+                                    <td class="py-3 px-4"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px]">{{ st.class }}</span></td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex flex-wrap gap-1">
+                                            <span v-for="subId in getStudentRegistrations(st.id)" :key="subId"
+                                                class="px-2 py-0.5 rounded text-[11px] border"
+                                                :class="getSubjectStatusClass(subId)">
+                                                {{ getSubjectDisplayName(subId) }}
+                                            </span>
+                                            <span v-if="getStudentRegistrations(st.id).length === 0" class="text-slate-400 italic text-[11px]">Chưa đăng ký</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- SUB TAB 4: CLASS REGISTRATION STATISTICS -->
+                <div v-if="adminTab === 'stats'" class="space-y-6">
+                    <!-- Statistics Summary Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shrink-0">
+                                <i class="fa-solid fa-school"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium">Tổng Số Lớp</p>
+                                <p class="text-xl font-bold text-slate-800">{{ uniqueClasses.length }} <span class="text-xs font-normal text-slate-500">lớp</span></p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0">
+                                <i class="fa-solid fa-user-check"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium">Đã Đăng Ký</p>
+                                <p class="text-xl font-bold text-slate-800">{{ overallRegisteredStudentsCount }} <span class="text-xs font-normal text-slate-500">/ {{ students.length }} HS</span></p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                                <i class="fa-solid fa-user-clock"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium">Chưa Đăng Ký</p>
+                                <p class="text-xl font-bold text-slate-800">{{ overallUnregisteredStudentsCount }} <span class="text-xs font-normal text-slate-500">HS</span></p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shrink-0">
+                                <i class="fa-solid fa-chart-pie"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium">Tỷ Lệ Hoàn Thành</p>
+                                <p class="text-xl font-bold text-indigo-600">{{ overallCompletionPercentage }}%</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Matrix Table: Registration stats by Class -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-sm">Bảng Thống Kê Đăng Ký Môn Học Theo Lớp</h3>
+                                <p class="text-xs text-slate-500">Tổng hợp số lượng học sinh đăng ký từng môn của từng lớp</p>
+                            </div>
+                            <button @click="exportClassStatsToExcel" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto">
+                                <i class="fa-solid fa-file-excel"></i>
+                                <span>Xuất Thống Kê Excel</span>
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                                        <th class="py-3 px-4 w-12 text-center">STT</th>
+                                        <th class="py-3 px-4 min-w-[100px]">Lớp</th>
+                                        <th class="py-3 px-4 text-center w-24">Sĩ Số</th>
+                                        <th class="py-3 px-4 text-center w-28">Đã Đăng Ký</th>
+                                        <th class="py-3 px-4 text-center w-28">Chưa Đăng Ký</th>
+                                        <th class="py-3 px-4 min-w-[140px]">Tiến Độ</th>
+                                        <th v-for="sub in activeSubjects" :key="sub.id" class="py-3 px-3 text-center min-w-[90px]">
+                                            <span class="block font-mono text-purple-700">{{ sub.id }}</span>
+                                            <span class="text-[10px] text-slate-400 font-normal truncate max-w-[80px] inline-block" :title="sub.name">{{ sub.name }}</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-xs">
+                                    <tr v-if="classStatistics.length === 0">
+                                        <td :colspan="6 + activeSubjects.length" class="py-8 text-center text-slate-400">
+                                            Chưa có dữ liệu lớp học.
+                                        </td>
+                                    </tr>
+                                    <tr v-for="(clsStat, idx) in classStatistics" :key="clsStat.className" class="hover:bg-slate-50 transition-all">
+                                        <td class="py-3 px-4 text-center text-slate-400 font-semibold">{{ idx + 1 }}</td>
+                                        <td class="py-3 px-4 font-bold text-slate-800">
+                                            <span class="bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg border border-purple-200/60 font-semibold">
+                                                Lớp {{ clsStat.className }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-center font-bold text-slate-700">{{ clsStat.totalStudents }}</td>
+                                        <td class="py-3 px-4 text-center">
+                                            <span class="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full text-[11px]">
+                                                {{ clsStat.registeredStudents }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-center">
+                                            <span class="font-bold px-2 py-0.5 rounded-full text-[11px]" :class="clsStat.unregisteredStudents > 0 ? 'bg-amber-50 text-amber-700' : 'text-slate-400 bg-slate-100'">
+                                                {{ clsStat.unregisteredStudents }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <div class="flex items-center space-x-2">
+                                                <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                                                    <div class="bg-indigo-600 h-2 rounded-full transition-all duration-500" :style="{ width: clsStat.completionRate + '%' }"></div>
+                                                </div>
+                                                <span class="text-[11px] font-semibold text-slate-600 w-9 text-right">{{ clsStat.completionRate }}%</span>
+                                            </div>
+                                        </td>
+                                        <td v-for="sub in activeSubjects" :key="sub.id" class="py-3 px-3 text-center">
+                                            <span class="font-semibold text-xs" :class="(clsStat.subjectCounts[sub.id] || 0) > 0 ? 'text-indigo-600 font-bold' : 'text-slate-300'">
+                                                {{ clsStat.subjectCounts[sub.id] || 0 }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <!-- Total Summary Footer Row -->
+                                <tfoot v-if="classStatistics.length > 0" class="bg-slate-100/80 font-bold text-xs border-t-2 border-slate-300 text-slate-800">
+                                    <tr>
+                                        <td colspan="2" class="py-3 px-4 text-right uppercase text-[11px] text-slate-600">Tổng Cộng:</td>
+                                        <td class="py-3 px-4 text-center text-slate-900">{{ students.length }}</td>
+                                        <td class="py-3 px-4 text-center text-emerald-700">{{ overallRegisteredStudentsCount }}</td>
+                                        <td class="py-3 px-4 text-center text-amber-700">{{ overallUnregisteredStudentsCount }}</td>
+                                        <td class="py-3 px-4">
+                                            <span class="text-indigo-700">{{ overallCompletionPercentage }}%</span>
+                                        </td>
+                                        <td v-for="sub in activeSubjects" :key="sub.id" class="py-3 px-3 text-center text-purple-700">
+                                            {{ getRegisteredCountForSubject(sub.id) }}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+
+        <!-- MODAL 1: SINGLE STUDENT REGISTRATION MODAL -->
+        <div v-if="activeStudentModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
+                <div class="p-5 bg-indigo-600 text-white flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-base">Đăng Ký Môn Học</h3>
+                        <p class="text-xs text-indigo-100 mt-0.5">
+                            HS: <strong>{{ activeStudentModal.name }}</strong> - Lớp {{ activeStudentModal.class }}
+                        </p>
+                    </div>
+                    <button @click="activeStudentModal = null" class="text-indigo-200 hover:text-white text-lg">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="p-5 max-h-[60vh] overflow-y-auto space-y-2 custom-scrollbar">
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Tích chọn các môn học cho học sinh:</p>
+
+                    <label v-for="sub in activeSubjects" :key="sub.id"
+                        class="flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:bg-slate-50"
+                        :class="tempStudentSubjects.includes(sub.id) ? 'border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-500/20' : 'border-slate-200'">
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" :value="sub.id" v-model="tempStudentSubjects" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                            <div>
+                                <p class="font-bold text-xs text-slate-800">{{ sub.name }}</p>
+                                <p class="text-[10px] text-slate-500 font-mono">Mã môn: {{ sub.id }}</p>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end space-x-2">
+                    <button @click="activeStudentModal = null" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold">
+                        Hủy
+                    </button>
+                    <button @click="saveStudentSubjectsModal" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm">
+                        Lưu Đăng Ký
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 2: INSTRUCTIONS & GOOGLE APPS SCRIPT CODE -->
+        <div v-if="showInstructionsModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-100">
+                <div class="p-5 bg-indigo-900 text-white flex items-center justify-between">
+                    <h3 class="font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-book-open text-amber-400"></i>
+                        <span>Hướng Dẫn Cấu Trúc Sheet & Đồng Bộ</span>
+                    </h3>
+                    <button @click="showInstructionsModal = false" class="text-indigo-200 hover:text-white">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="p-6 max-h-[75vh] overflow-y-auto space-y-4 custom-scrollbar text-xs text-slate-700">
+                    <div class="bg-indigo-50 border border-indigo-200 p-4 rounded-xl">
+                        <h4 class="font-bold text-indigo-900 mb-1">Cấu trúc 3 trang tính (Tabs) chuẩn trong Google Sheet:</h4>
+                        <ul class="list-disc list-inside space-y-1 font-mono text-[11px] text-indigo-800">
+                            <li><strong>HocSinh:</strong> Cột: <code>id</code> | <code>name</code> | <code>class</code> | <code>gender</code> | <code>dob</code></li>
+                            <li><strong>MonHoc:</strong> Cột: <code>id</code> | <code>name</code> | <code>is_hidden</code> (Cột 3 chứa TRUE/FALSE)</li>
+                            <li><strong>DangKy:</strong> Cột: <code>student_id</code> | <code>subject_id</code></li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h4 class="font-bold text-slate-800 mb-1">Mã Google Apps Script (Tự động linh hoạt tên Sheet):</h4>
+                        <p class="text-slate-500 mb-2">Vào menu <em>Tiện ích mở rộng -> Apps Script</em> trong file Google Sheet, dán đoạn mã sau và Triển khai (Deploy) thành Web App:</p>
+                        
+                        <div class="relative bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-[11px] overflow-x-auto">
+                            <button @click="copyGasScript" class="absolute top-2 right-2 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px]">
+                                {{ copiedScript ? 'Đã Copy!' : 'Copy Code' }}
+                            </button>
+                            <pre><code>{{ gasScriptCode }}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-slate-50 border-t border-slate-200 text-right">
+                    <button @click="showInstructionsModal = false" class="px-5 py-2 bg-indigo-600 text-white rounded-xl font-semibold">
+                        Tôi Đã Hiểu
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                // Roles & View states
+                const currentRole = ref('teacher'); // 'teacher' | 'admin'
+                const adminTab = ref('config'); // 'config' | 'subjects' | 'students' | 'stats'
+
+                // Connection states
+                const defaultSheetUrl = 'https://docs.google.com/spreadsheets/d/1S9FenLplzssrMwcPIF3jxHjMpzXHC_xm2534mgy5nyU/edit?usp=sharing';
+                const defaultGasUrl = 'https://script.google.com/macros/s/AKfycbwoLiP3ls6BFGAKVYaslpg3pOWCYcR8hY6gHc-tTQ6iBOBLhqTcpfWGGV_4VRMuupOO/exec';
+                const sheetUrlInput = ref(localStorage.getItem('gs_url') || defaultSheetUrl);
+                const gasUrlInput = ref(localStorage.getItem('gas_url') || defaultGasUrl);
+                const sheetId = ref('');
+                const loading = ref(false);
+                const saving = ref(false);
+
+                // Toast state
+                const toast = ref({ show: false, title: '', message: '', type: 'info' });
+
+                // Modals
+                const showInstructionsModal = ref(false);
+                const activeStudentModal = ref(null);
+                const tempStudentSubjects = ref([]);
+
+                // Core Data Structures
+                const students = ref([]);
+                const subjects = ref([]); // [{ id: 'VL10', name: 'Vật Lý 10', isHidden: false }]
+                const registrations = ref({}); // { "HS1001": ["VL10", "HH10"] }
+
+                // Filters & Subject visibility
+                const selectedClass = ref('');
+                const searchQuery = ref('');
+                const selectedSubjectFilter = ref('');
+                const selectedStudentIds = ref([]);
+                const selectedBulkSubjectId = ref('');
+                const hideEmptySubjects = ref(true);
+
+                // Form editing
+                const editingSubject = ref(null);
+                const subjectForm = ref({ id: '', name: '', isHidden: false });
+
+                const copiedScript = ref(false);
+
+                const gasScriptCode = `function doGet(e) {
+  var action = e.parameter ? e.parameter.action : '';
+  if (action === 'getAllData') {
+    return ContentService.createTextOutput(JSON.stringify(getAllData()))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService.createTextOutput(JSON.stringify({status: 'error'})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    if (data.action === 'saveRegistrations' || data.action === 'saveAll') {
+      if (data.registrations) saveRegistrations(data.registrations);
+      if (data.subjects) saveSubjects(data.subjects);
+      return ContentService.createTextOutput(JSON.stringify({status: 'success'})).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({status: 'error', message: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getSheetByNameFlexible(ss, name) {
+  var sheet = ss.getSheetByName(name);
+  if (sheet) return sheet;
+  var allSheets = ss.getSheets();
+  var nameClean = name.toLowerCase().replace(/[\\s_]/g, '');
+  for (var i = 0; i < allSheets.length; i++) {
+    var sName = allSheets[i].getName().toLowerCase().replace(/[\\s_]/g, '');
+    if (sName === nameClean || sName.indexOf(nameClean) !== -1 || nameClean.indexOf(sName) !== -1) {
+      return allSheets[i];
+    }
+  }
+  return null;
+}
+
+function getAllData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. HocSinh
+  var hsSheet = getSheetByNameFlexible(ss, "HocSinh");
+  var hsData = hsSheet ? hsSheet.getDataRange().getDisplayValues() : [];
+  var students = [];
+  for (var i = 1; i < hsData.length; i++) {
+    if (hsData[i][0]) {
+      var dobVal = hsData[i][4];
+      students.push({
+        id: String(hsData[i][0]).trim(),
+        name: String(hsData[i][1] || '').trim(),
+        class: String(hsData[i][2] || '').trim(),
+        gender: String(hsData[i][3] || '').trim(),
+        dob: String(dobVal || '').trim()
+      });
+    }
+  }
+
+  // 2. MonHoc
+  var mhSheet = getSheetByNameFlexible(ss, "MonHoc");
+  var mhData = mhSheet ? mhSheet.getDataRange().getDisplayValues() : [];
+  var subjects = [];
+  for (var j = 1; j < mhData.length; j++) {
+    if (mhData[j][0]) {
+      var rawHidden = String(mhData[j][2] || '').toLowerCase().trim();
+      var isHidden = mhData[j][2] === true || rawHidden === 'true' || rawHidden === '1' || rawHidden === 'hidden' || rawHidden === 'đã ẩn';
+      subjects.push({
+        id: String(mhData[j][0]).trim(),
+        name: String(mhData[j][1] || '').trim(),
+        isHidden: isHidden
+      });
+    }
+  }
+
+  // 3. DangKy
+  var dkSheet = getSheetByNameFlexible(ss, "DangKy");
+  var dkData = dkSheet ? dkSheet.getDataRange().getDisplayValues() : [];
+  var registrations = {};
+  for (var k = 1; k < dkData.length; k++) {
+    var sId = String(dkData[k][0] || '').trim();
+    var subId = String(dkData[k][1] || '').trim();
+    if (sId && subId) {
+      if (!registrations[sId]) registrations[sId] = [];
+      if (registrations[sId].indexOf(subId) === -1) registrations[sId].push(subId);
+    }
+  }
+
+  return { status: 'success', students: students, subjects: subjects, registrations: registrations };
+}
+
+function saveRegistrations(regs) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var dkSheet = getSheetByNameFlexible(ss, "DangKy") || ss.insertSheet("DangKy");
+  dkSheet.clear();
+  
+  // Đặt tiêu đề cột
+  dkSheet.appendRow(["student_id", "subject_id"]);
+  dkSheet.getRange(1, 1, 1, 2).setNumberFormat('@');
+  
+  var rows = [];
+  for (var sId in regs) {
+    var list = regs[sId];
+    if (Array.isArray(list)) {
+      for (var m = 0; m < list.length; m++) {
+        rows.push([String(sId), String(list[m])]);
+      }
+    }
+  }
+  if (rows.length > 0) {
+    var range = dkSheet.getRange(2, 1, rows.length, 2);
+    // Ép định dạng Plain Text (@) trước khi điền dữ liệu để không bị mất số 0 ở đầu
+    range.setNumberFormat('@');
+    range.setValues(rows);
+  }
+}
+
+function saveSubjects(subs) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var mhSheet = getSheetByNameFlexible(ss, "MonHoc") || ss.insertSheet("MonHoc");
+  mhSheet.clear();
+  mhSheet.appendRow(["id", "name", "is_hidden"]);
+  
+  var rows = [];
+  for (var i = 0; i < subs.length; i++) {
+    rows.push([String(subs[i].id), String(subs[i].name), subs[i].isHidden ? true : false]);
+  }
+  if (rows.length > 0) {
+    var range = mhSheet.getRange(2, 1, rows.length, 3);
+    mhSheet.getRange(2, 1, rows.length, 1).setNumberFormat('@');
+    range.setValues(rows);
+  }
+}`;
+
+                // Helper to extract Sheet ID from full Google Sheet URL
+                const extractSheetId = (url) => {
+                    if (!url) return '';
+                    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                    return match ? match[1] : url.trim();
+                };
+
+                // Toast Helper
+                const showToast = (title, message, type = 'info') => {
+                    toast.value = { show: true, title, message, type };
+                    setTimeout(() => { toast.value.show = false; }, 4000);
+                };
+
+                // Fetch Sheet Data with flexible tab name fallback
+                const fetchGvizData = async (sid, sheetName) => {
+                    const possibleNames = [sheetName];
+                    if (sheetName === 'DangKy') possibleNames.push('Dang Ky', 'Đăng Ký', 'Đăng ký', 'Dang_Ky');
+                    if (sheetName === 'HocSinh') possibleNames.push('Hoc Sinh', 'Học Sinh', 'Học sinh');
+                    if (sheetName === 'MonHoc') possibleNames.push('Mon Hoc', 'Môn Học', 'Môn học');
+
+                    for (const name of possibleNames) {
+                        try {
+                            const gvizUrl = `https://docs.google.com/spreadsheets/d/${sid}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`;
+                            const response = await fetch(gvizUrl);
+                            if (!response.ok) continue;
+                            
+                            const text = await response.text();
+                            const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
+                            if (!jsonMatch || !jsonMatch[1]) continue;
+                            
+                            const data = JSON.parse(jsonMatch[1]);
+                            const table = data.table;
+                            if (!table || !table.rows) continue;
+
+                            const rows = table.rows.map(row => {
+                                return row.c ? row.c.map(cell => {
+                                    if (!cell) return '';
+                                    if (cell.f !== undefined && cell.f !== null) return String(cell.f).trim();
+                                    if (cell.v !== undefined && cell.v !== null) return String(cell.v).trim();
+                                    return '';
+                                }) : [];
+                            });
+
+                            if (rows.length > 0) return rows;
+                        } catch (e) {
+                            console.warn(`Lỗi khi tải sheet ${name}:`, e);
+                        }
+                    }
+                    return [];
+                };
+
+                // Safe Registration Lookup Helper (Case-insensitive & space trimmed)
+                const getStudentRegistrations = (studentId) => {
+                    if (!studentId) return [];
+                    const cleanId = String(studentId).trim().toLowerCase();
+                    const key = Object.keys(registrations.value).find(k => String(k).trim().toLowerCase() === cleanId);
+                    return key ? (registrations.value[key] || []) : [];
+                };
+
+                // Load Data from Google Sheet URL
+                const loadDataFromSheetUrl = async () => {
+                    const sid = extractSheetId(sheetUrlInput.value);
+                    if (!sid) {
+                        showToast('Lỗi URL', 'Vui lòng dán liên kết Google Sheet hợp lệ.', 'error');
+                        return;
+                    }
+
+                    loading.value = true;
+                    sheetId.value = sid;
+                    localStorage.setItem('gs_url', sheetUrlInput.value);
+
+                    try {
+                        let parsedStudentsList = [];
+                        let parsedSubjectsList = [];
+                        let rawRegsMap = null;
+
+                        // 1. Attempt load via Google Apps Script endpoint if available
+                        if (gasUrlInput.value) {
+                            try {
+                                const gasRes = await fetch(`${gasUrlInput.value}?action=getAllData`);
+                                if (gasRes.ok) {
+                                    const resJson = await gasRes.json();
+                                    if (resJson.status === 'success') {
+                                        parsedStudentsList = (resJson.students || []).map(s => ({
+                                            id: String(s.id).trim(),
+                                            name: String(s.name || '').trim(),
+                                            class: String(s.class || '').trim(),
+                                            gender: String(s.gender || '').trim(),
+                                            dob: String(s.dob || '').trim()
+                                        }));
+
+                                        parsedSubjectsList = (resJson.subjects || []).map(s => ({
+                                            id: String(s.id).trim(),
+                                            name: String(s.name || '').trim(),
+                                            isHidden: !!s.isHidden
+                                        }));
+
+                                        rawRegsMap = resJson.registrations || {};
+                                    }
+                                }
+                            } catch (e) {
+                                console.log("Không phản hồi Apps Script API, chuyển sang đọc GViz trực tiếp:", e);
+                            }
+                        }
+
+                        // 2. Direct GViz Fallback if GAS was not used or failed
+                        if (parsedStudentsList.length === 0) {
+                            // Fetch HocSinh
+                            const hsRows = await fetchGvizData(sid, 'HocSinh');
+                            let idCol = 0, nameCol = 1, classCol = 2, genderCol = 3, dobCol = 4;
+                            let startHsRow = 0;
+
+                            if (hsRows.length > 0) {
+                                const row0 = hsRows[0].map(c => String(c).toLowerCase().trim());
+                                const foundId = row0.findIndex(c => c.includes('id') || c.includes('mã'));
+                                const foundName = row0.findIndex(c => c.includes('name') || c.includes('tên') || c.includes('họ'));
+                                const foundClass = row0.findIndex(c => c.includes('class') || c.includes('lớp'));
+                                
+                                if (foundId !== -1 || foundName !== -1) {
+                                    startHsRow = 1;
+                                    if (foundId !== -1) idCol = foundId;
+                                    if (foundName !== -1) nameCol = foundName;
+                                    if (foundClass !== -1) classCol = foundClass;
+                                }
+
+                                for (let i = startHsRow; i < hsRows.length; i++) {
+                                    const r = hsRows[i];
+                                    const stId = String(r[idCol] || '').trim();
+                                    if (stId && stId.toLowerCase() !== 'id' && stId.toLowerCase() !== 'mã hs') {
+                                        parsedStudentsList.push({
+                                            id: stId,
+                                            name: String(r[nameCol] || '').trim(),
+                                            class: String(r[classCol] || '').trim(),
+                                            gender: String(r[genderCol] || '').trim(),
+                                            dob: String(r[dobCol] || '').trim()
+                                        });
+                                    }
+                                }
+                            }
+
+                            // Fetch MonHoc
+                            const mhRows = await fetchGvizData(sid, 'MonHoc');
+                            let subIdCol = 0, subNameCol = 1, subHiddenCol = 2;
+                            let startMhRow = 0;
+
+                            if (mhRows.length > 0) {
+                                const row0 = mhRows[0].map(c => String(c).toLowerCase().trim());
+                                const foundSubId = row0.findIndex(c => c.includes('id') || c.includes('mã'));
+                                const foundSubName = row0.findIndex(c => c.includes('name') || c.includes('tên'));
+                                const foundSubHidden = row0.findIndex(c => c.includes('hidden') || c.includes('ẩn'));
+
+                                if (foundSubId !== -1 || foundSubName !== -1) {
+                                    startMhRow = 1;
+                                    if (foundSubId !== -1) subIdCol = foundSubId;
+                                    if (foundSubName !== -1) subNameCol = foundSubName;
+                                    if (foundSubHidden !== -1) subHiddenCol = foundSubHidden;
+                                }
+
+                                for (let j = startMhRow; j < mhRows.length; j++) {
+                                    const r = mhRows[j];
+                                    const sId = String(r[subIdCol] || '').trim();
+                                    if (sId && sId.toLowerCase() !== 'id' && sId.toLowerCase() !== 'mã môn') {
+                                        const rawHidden = String(r[subHiddenCol] || '').toLowerCase().trim();
+                                        const isHidden = rawHidden === 'true' || rawHidden === '1' || rawHidden === 'hidden' || rawHidden === 'đã ẩn';
+                                        parsedSubjectsList.push({
+                                            id: sId,
+                                            name: String(r[subNameCol] || '').trim(),
+                                            isHidden: isHidden
+                                        });
+                                    }
+                                }
+                            }
+
+                            // Fetch DangKy with dynamic header detection
+                            const dkRows = await fetchGvizData(sid, 'DangKy');
+                            rawRegsMap = {};
+                            let studentColIdx = 0;
+                            let subjectColIdx = 1;
+                            let startDkRow = 0;
+
+                            if (dkRows.length > 0) {
+                                const row0 = dkRows[0].map(c => String(c).toLowerCase().trim());
+                                const headerSIdx = row0.findIndex(c => c.includes('student') || c.includes('hoc_sinh') || c.includes('mã hs') || c.includes('ma hs') || c.includes('id hs') || c === 'id');
+                                const headerMIdx = row0.findIndex(c => c.includes('subject') || c.includes('mon_hoc') || c.includes('mã môn') || c.includes('ma mon') || c.includes('mã mh'));
+
+                                if (headerSIdx !== -1 && headerMIdx !== -1) {
+                                    studentColIdx = headerSIdx;
+                                    subjectColIdx = headerMIdx;
+                                    startDkRow = 1;
+                                } else if (row0.some(c => c.includes('student') || c.includes('subject') || c.includes('mã') || c.includes('đăng ký'))) {
+                                    startDkRow = 1;
+                                }
+
+                                for (let k = startDkRow; k < dkRows.length; k++) {
+                                    const r = dkRows[k];
+                                    if (!r || r.length === 0) continue;
+                                    const rawSId = String(r[studentColIdx] || '').trim();
+                                    const rawSubId = String(r[subjectColIdx] || '').trim();
+                                    if (rawSId && rawSubId) {
+                                        if (!rawRegsMap[rawSId]) rawRegsMap[rawSId] = [];
+                                        if (!rawRegsMap[rawSId].includes(rawSubId)) rawRegsMap[rawSId].push(rawSubId);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Update global state if parsed data valid
+                        if (parsedStudentsList.length > 0) students.value = parsedStudentsList;
+                        if (parsedSubjectsList.length > 0) subjects.value = parsedSubjectsList;
+
+                        // Normalize & Link Registrations
+                        const normalizedRegs = {};
+                        if (rawRegsMap && Object.keys(rawRegsMap).length > 0) {
+                            Object.keys(rawRegsMap).forEach(sKey => {
+                                const cleanSKey = String(sKey).trim();
+                                const matchedStudent = students.value.find(s => s.id.toLowerCase() === cleanSKey.toLowerCase());
+                                const targetStId = matchedStudent ? matchedStudent.id : cleanSKey;
+
+                                if (!normalizedRegs[targetStId]) normalizedRegs[targetStId] = [];
+
+                                const list = rawRegsMap[sKey];
+                                if (Array.isArray(list)) {
+                                    list.forEach(subId => {
+                                        const cleanSubId = String(subId).trim();
+                                        const matchedSub = subjects.value.find(sub => sub.id.toLowerCase() === cleanSubId.toLowerCase());
+                                        const targetSubId = matchedSub ? matchedSub.id : cleanSubId;
+
+                                        if (!normalizedRegs[targetStId].includes(targetSubId)) {
+                                            normalizedRegs[targetStId].push(targetSubId);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        // Set registrations directly without saving to localStorage
+                        if (Object.keys(normalizedRegs).length > 0) {
+                            registrations.value = normalizedRegs;
+                            showToast('Thành công', `Đã tải ${students.value.length} học sinh và dữ liệu đăng ký môn!`, 'success');
+                        } else {
+                            registrations.value = {};
+                            showToast('Thành công', `Đã tải ${students.value.length} học sinh từ Google Sheet.`, 'success');
+                        }
+
+                    } catch (err) {
+                        console.error("Fetch Sheet Error:", err);
+                        showToast('Lỗi kết nối', 'Không thể đọc file Google Sheet. Vui lòng kiểm tra quyền chia sẻ công khai.', 'error');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                // Save All Changes (Sync back)
+                const saveAllData = async () => {
+                    localStorage.setItem('local_subs', JSON.stringify(subjects.value));
+
+                    if (gasUrlInput.value) {
+                        saving.value = true;
+                        try {
+                            const response = await fetch(gasUrlInput.value, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain' },
+                                body: JSON.stringify({
+                                    action: 'saveAll',
+                                    registrations: registrations.value,
+                                    subjects: subjects.value
+                                })
+                            });
+                            const result = await response.json();
+                            if (result.status === 'success') {
+                                showToast('Đồng bộ thành công', 'Đã lưu dữ liệu môn học và đăng ký trực tiếp về Google Sheet!', 'success');
+                            } else {
+                                throw new Error(result.message || 'Lỗi không xác định');
+                            }
+                        } catch (e) {
+                            showToast('Lưu không thành công', 'Không thể kết nối đến Google Apps Script để lưu dữ liệu.', 'error');
+                        } finally {
+                            saving.value = false;
+                        }
+                    } else {
+                        showToast('Thông báo', 'Cần nhập URL Apps Script để đồng bộ dữ liệu về Google Sheet.', 'info');
+                    }
+                };
+
+                const saveAndLoadSheetConfig = () => {
+                    localStorage.setItem('gas_url', gasUrlInput.value);
+                    loadDataFromSheetUrl();
+                };
+
+                // Active (Non-hidden) Subjects list for GVCN
+                const activeSubjects = computed(() => {
+                    return subjects.value.filter(s => !s.isHidden);
+                });
+
+                const classStatistics = computed(() => {
+                    const stats = {};
+
+                    // Ensure classes from uniqueClasses exist in stats
+                    uniqueClasses.value.forEach(cls => {
+                        stats[cls] = {
+                            className: cls,
+                            totalStudents: 0,
+                            registeredStudents: 0,
+                            unregisteredStudents: 0,
+                            completionRate: 0,
+                            subjectCounts: {}
+                        };
+                        activeSubjects.value.forEach(sub => {
+                            stats[cls].subjectCounts[sub.id] = 0;
+                        });
+                    });
+
+                    // Aggregate student registration data per class
+                    students.value.forEach(st => {
+                        const cls = st.class || 'Khác';
+                        if (!stats[cls]) {
+                            stats[cls] = {
+                                className: cls,
+                                totalStudents: 0,
+                                registeredStudents: 0,
+                                unregisteredStudents: 0,
+                                completionRate: 0,
+                                subjectCounts: {}
+                            };
+                            activeSubjects.value.forEach(sub => {
+                                stats[cls].subjectCounts[sub.id] = 0;
+                            });
+                        }
+
+                        stats[cls].totalStudents++;
+                        const regs = getStudentRegistrations(st.id);
+
+                        if (regs.length > 0) {
+                            stats[cls].registeredStudents++;
+                        } else {
+                            stats[cls].unregisteredStudents++;
+                        }
+
+                        regs.forEach(subId => {
+                            const matchedSub = activeSubjects.value.find(s => s.id.toLowerCase() === String(subId).toLowerCase());
+                            if (matchedSub) {
+                                stats[cls].subjectCounts[matchedSub.id] = (stats[cls].subjectCounts[matchedSub.id] || 0) + 1;
+                            }
+                        });
+                    });
+
+                    // Calculate completion percentage rate
+                    Object.values(stats).forEach(item => {
+                        item.completionRate = item.totalStudents > 0
+                            ? Math.round((item.registeredStudents / item.totalStudents) * 100)
+                            : 0;
+                    });
+
+                    return Object.values(stats).sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }));
+                });
+
+                const overallRegisteredStudentsCount = computed(() => {
+                    return students.value.filter(st => getStudentRegistrations(st.id).length > 0).length;
+                });
+
+                const overallUnregisteredStudentsCount = computed(() => {
+                    return students.value.length - overallRegisteredStudentsCount.value;
+                });
+
+                const overallCompletionPercentage = computed(() => {
+                    if (students.value.length === 0) return 0;
+                    return Math.round((overallRegisteredStudentsCount.value / students.value.length) * 100);
+                });
+
+                const exportClassStatsToExcel = () => {
+                    if (classStatistics.value.length === 0) {
+                        showToast('Cảnh báo', 'Không có dữ liệu lớp học để xuất báo cáo.', 'error');
+                        return;
+                    }
+
+                    const excelRows = classStatistics.value.map((cls, idx) => {
+                        const row = {
+                            'STT': idx + 1,
+                            'Lớp': cls.className,
+                            'Sĩ Số': cls.totalStudents,
+                            'Đã Đăng Ký (HS)': cls.registeredStudents,
+                            'Chưa Đăng Ký (HS)': cls.unregisteredStudents,
+                            'Tỉ Lệ Hoàn Thành (%)': `${cls.completionRate}%`
+                        };
+
+                        activeSubjects.value.forEach(sub => {
+                            row[`Môn ${sub.name} (${sub.id})`] = cls.subjectCounts[sub.id] || 0;
+                        });
+
+                        return row;
+                    });
+
+                    const worksheet = XLSX.utils.json_to_sheet(excelRows);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'ThongKeTheoLop');
+
+                    const fileName = `Bao_Cao_Thong_Ke_Dang_Ky_Theo_Lop.xlsx`;
+                    XLSX.writeFile(workbook, fileName);
+                    showToast('Xuất Excel thành công', `Đã tải xuống file ${fileName}`, 'success');
+                };
+
+                // Diagnostics for hidden or unknown subject registrations
+                const hiddenOrUnknownRegistrationsCount = computed(() => {
+                    let count = 0;
+                    const activeSubjectIds = new Set(activeSubjects.value.map(s => s.id.toLowerCase()));
+                    Object.values(registrations.value).forEach(list => {
+                        if (Array.isArray(list)) {
+                            list.forEach(id => {
+                                if (!activeSubjectIds.has(String(id).toLowerCase())) count++;
+                            });
+                        }
+                    });
+                    return count;
+                });
+
+                // Computed Filters
+                const uniqueClasses = computed(() => {
+                    const set = new Set(students.value.map(s => s.class).filter(Boolean));
+                    return Array.from(set).sort();
+                });
+
+                const filteredStudents = computed(() => {
+                    const list = students.value.filter(st => {
+                        const matchClass = !selectedClass.value || st.class === selectedClass.value;
+                        const q = searchQuery.value.toLowerCase().trim();
+                        const matchQuery = !q || st.name.toLowerCase().includes(q) || st.id.toLowerCase().includes(q);
+                        
+                        const regList = getStudentRegistrations(st.id);
+
+                        let matchSubject = true;
+                        if (selectedSubjectFilter.value === 'unregistered') {
+                            matchSubject = regList.length === 0;
+                        } else if (selectedSubjectFilter.value) {
+                            matchSubject = regList.some(subId => String(subId).toLowerCase() === selectedSubjectFilter.value.toLowerCase());
+                        }
+
+                        return matchClass && matchQuery && matchSubject;
+                    });
+
+                    // Sắp xếp các học sinh đã đăng ký môn học lên phía trên danh sách
+                    return list.slice().sort((a, b) => {
+                        const countA = getStudentRegistrations(a.id).length;
+                        const countB = getStudentRegistrations(b.id).length;
+                        if (countA > 0 && countB === 0) return -1;
+                        if (countA === 0 && countB > 0) return 1;
+                        return countB - countA; // Học sinh đăng ký nhiều môn hơn xếp trước
+                    });
+                });
+
+                const isAllSelected = computed(() => {
+                    if (filteredStudents.value.length === 0) return false;
+                    return filteredStudents.value.every(st => selectedStudentIds.value.includes(st.id));
+                });
+
+                const totalRegistrationsCount = computed(() => {
+                    let count = 0;
+                    Object.values(registrations.value).forEach(list => {
+                        if (Array.isArray(list)) {
+                            count += list.length;
+                        }
+                    });
+                    return count;
+                });
+
+                // Selection Actions
+                const toggleSelectAll = () => {
+                    if (isAllSelected.value) {
+                        selectedStudentIds.value = [];
+                    } else {
+                        selectedStudentIds.value = filteredStudents.value.map(s => s.id);
+                    }
+                };
+
+                const resetFilters = () => {
+                    selectedClass.value = '';
+                    searchQuery.value = '';
+                    selectedSubjectFilter.value = '';
+                    selectedStudentIds.value = [];
+                };
+
+                // Subject Registration Logic & Display helpers
+                const getSubjectDisplayName = (subId) => {
+                    if (!subId) return '';
+                    const sub = subjects.value.find(s => String(s.id).trim().toLowerCase() === String(subId).trim().toLowerCase());
+                    if (!sub) return `${subId} (Mã không tồn tại)`;
+                    if (sub.isHidden) return `${sub.name} (Đã ẩn)`;
+                    return sub.name;
+                };
+
+                const getSubjectStatusClass = (subId) => {
+                    if (!subId) return 'bg-slate-100 text-slate-600 border-slate-200';
+                    const sub = subjects.value.find(s => String(s.id).trim().toLowerCase() === String(subId).trim().toLowerCase());
+                    if (!sub) return 'bg-red-50 text-red-700 border-red-200';
+                    if (sub.isHidden) return 'bg-amber-50 text-amber-800 border-amber-300';
+                    return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                };
+
+                const getRegisteredCountForSubject = (subId) => {
+                    let count = 0;
+                    const targetStudents = (selectedClass.value || searchQuery.value || selectedSubjectFilter.value)
+                        ? filteredStudents.value
+                        : students.value;
+
+                    targetStudents.forEach(st => {
+                        const list = getStudentRegistrations(st.id);
+                        if (list.some(id => String(id).toLowerCase() === String(subId).toLowerCase())) {
+                            count++;
+                        }
+                    });
+                    return count;
+                };
+
+                // Computed list of displayed subjects based on hideEmptySubjects setting (for GVCN view)
+                const displayedSubjects = computed(() => {
+                    const baseList = activeSubjects.value;
+                    if (!hideEmptySubjects.value) return baseList;
+                    return baseList.filter(sub => getRegisteredCountForSubject(sub.id) > 0);
+                });
+
+                const removeSubjectFromStudent = (studentId, subId) => {
+                    const cleanStId = String(studentId).trim().toLowerCase();
+                    const existingKey = Object.keys(registrations.value).find(k => k.trim().toLowerCase() === cleanStId) || studentId;
+                    
+                    if (registrations.value[existingKey]) {
+                        registrations.value[existingKey] = registrations.value[existingKey].filter(id => String(id).toLowerCase() !== String(subId).toLowerCase());
+                    }
+                };
+
+                const applyBulkSubject = (subId) => {
+                    if (selectedStudentIds.value.length === 0) return;
+                    selectedStudentIds.value.forEach(stId => {
+                        const cleanStId = String(stId).trim().toLowerCase();
+                        const existingKey = Object.keys(registrations.value).find(k => k.trim().toLowerCase() === cleanStId) || stId;
+
+                        if (!registrations.value[existingKey]) registrations.value[existingKey] = [];
+                        if (!registrations.value[existingKey].some(id => String(id).toLowerCase() === String(subId).toLowerCase())) {
+                            registrations.value[existingKey].push(subId);
+                        }
+                    });
+                    showToast('Đăng ký hàng loạt', `Đã gán môn ${getSubjectDisplayName(subId)} cho ${selectedStudentIds.value.length} học sinh.`, 'success');
+                };
+
+                const openStudentRegisterModal = (student) => {
+                    activeStudentModal.value = student;
+                    const activeSubjectIds = activeSubjects.value.map(s => s.id.toLowerCase());
+                    const studentRegs = getStudentRegistrations(student.id);
+                    tempStudentSubjects.value = studentRegs.filter(id => activeSubjectIds.includes(String(id).toLowerCase()));
+                };
+
+                // Helper kiểm tra học sinh đã đăng ký môn cụ thể chưa
+                const isSubjectRegistered = (studentId, subId) => {
+                    const list = getStudentRegistrations(studentId);
+                    return list.some(id => String(id).toLowerCase() === String(subId).toLowerCase());
+                };
+
+                // Hàm bật/tắt trực tiếp đăng ký môn học cho học sinh
+                const toggleSubjectForStudent = (studentId, subId) => {
+                    const cleanStId = String(studentId).trim().toLowerCase();
+                    const existingKey = Object.keys(registrations.value).find(k => k.trim().toLowerCase() === cleanStId) || studentId;
+
+                    if (!registrations.value[existingKey]) {
+                        registrations.value[existingKey] = [];
+                    }
+
+                    const index = registrations.value[existingKey].findIndex(id => String(id).toLowerCase() === String(subId).toLowerCase());
+                    if (index !== -1) {
+                        registrations.value[existingKey].splice(index, 1);
+                    } else {
+                        registrations.value[existingKey].push(subId);
+                    }
+                };
+
+                const saveStudentSubjectsModal = () => {
+                    if (activeStudentModal.value) {
+                        const studentId = activeStudentModal.value.id;
+                        const cleanStId = String(studentId).trim().toLowerCase();
+                        const existingKey = Object.keys(registrations.value).find(k => k.trim().toLowerCase() === cleanStId) || studentId;
+
+                        const currentRegs = getStudentRegistrations(studentId);
+                        const hiddenOrInvalidSubjectIds = currentRegs.filter(id => {
+                            const sub = subjects.value.find(s => s.id.toLowerCase() === String(id).toLowerCase());
+                            return !sub || sub.isHidden;
+                        });
+
+                        registrations.value[existingKey] = [...hiddenOrInvalidSubjectIds, ...tempStudentSubjects.value];
+                        
+                        activeStudentModal.value = null;
+                        showToast('Cập nhật thành công', 'Đã lưu danh sách môn chọn cho học sinh.', 'success');
+                    }
+                };
+
+                // Admin Subjects Management
+                const saveSubject = () => {
+                    const cleanId = subjectForm.value.id.trim();
+                    const cleanName = subjectForm.value.name.trim();
+
+                    if (!cleanId || !cleanName) {
+                        showToast('Lỗi', 'Vui lòng nhập đầy đủ Mã và Tên môn học', 'error');
+                        return;
+                    }
+
+                    if (editingSubject.value) {
+                        const idx = subjects.value.findIndex(s => s.id.toLowerCase() === cleanId.toLowerCase());
+                        if (idx !== -1) {
+                            subjects.value[idx].name = cleanName;
+                            subjects.value[idx].isHidden = subjectForm.value.isHidden;
+                        }
+                        editingSubject.value = null;
+                    } else {
+                        if (subjects.value.some(s => s.id.toLowerCase() === cleanId.toLowerCase())) {
+                            showToast('Lỗi', 'Mã môn học này đã tồn tại', 'error');
+                            return;
+                        }
+                        subjects.value.push({
+                            id: cleanId,
+                            name: cleanName,
+                            isHidden: !!subjectForm.value.isHidden
+                        });
+                    }
+                    subjectForm.value = { id: '', name: '', isHidden: false };
+                    showToast('Thành công', 'Đã cập nhật danh sách môn học.', 'success');
+                    saveAllData();
+                };
+
+                const editSubject = (sub) => {
+                    editingSubject.value = sub;
+                    subjectForm.value = { id: sub.id, name: sub.name, isHidden: !!sub.isHidden };
+                };
+
+                const toggleSubjectVisibility = (sub) => {
+                    sub.isHidden = !sub.isHidden;
+                    showToast('Cập nhật trạng thái', `Đã ${sub.isHidden ? 'ẩn' : 'mở hiển thị'} môn ${sub.name}`, 'info');
+                    saveAllData();
+                };
+
+                const cancelSubjectEdit = () => {
+                    editingSubject.value = null;
+                    subjectForm.value = { id: '', name: '', isHidden: false };
+                };
+
+                const deleteSubject = (subId) => {
+                    subjects.value = subjects.value.filter(s => s.id.toLowerCase() !== subId.toLowerCase());
+                    showToast('Đã xóa môn', `Đã xóa môn học ${subId}`, 'info');
+                    saveAllData();
+                };
+
+                const exportToExcel = () => {
+                    const listToExport = filteredStudents.value.length > 0 ? filteredStudents.value : students.value;
+                    if (listToExport.length === 0) {
+                        showToast('Cảnh báo', 'Không có dữ liệu học sinh để xuất file Excel.', 'error');
+                        return;
+                    }
+
+                    const excelData = listToExport.map((st, idx) => {
+                        const regIds = getStudentRegistrations(st.id);
+                        const regNames = regIds.map(id => getSubjectDisplayName(id)).join(', ');
+                        const regCodes = regIds.join(', ');
+
+                        return {
+                            'STT': idx + 1,
+                            'Mã Học Sinh': st.id,
+                            'Họ Và Tên': st.name,
+                            'Lớp': st.class,
+                            'Giới Tính': st.gender || '',
+                            'Ngày Sinh': st.dob || '',
+                            'Môn Đăng Ký': regNames || 'Chưa đăng ký',
+                            'Mã Môn': regCodes || '',
+                            'Số Lượng Môn': regIds.length
+                        };
+                    });
+
+                    // Tạo Worksheet & Workbook từ SheetJS
+                    const worksheet = XLSX.utils.json_to_sheet(excelData);
+                    
+                    // Thiết lập độ rộng thích hợp cho từng cột
+                    worksheet['!cols'] = [
+                        { wch: 6 },  // STT
+                        { wch: 12 }, // Mã HS
+                        { wch: 25 }, // Họ Tên
+                        { wch: 10 }, // Lớp
+                        { wch: 10 }, // Giới tính
+                        { wch: 14 }, // Ngày sinh
+                        { wch: 40 }, // Môn đăng ký
+                        { wch: 20 }, // Mã môn
+                        { wch: 14 }  // Số lượng môn
+                    ];
+
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'DanhSachDangKy');
+
+                    // Đặt tên file theo bộ lọc lớp (nếu có)
+                    const className = selectedClass.value ? `Lop_${selectedClass.value}` : 'TatCaCacLop';
+                    const fileName = `Danh_Sach_Dang_Ky_Mon_Hoc_${className}.xlsx`;
+
+                    XLSX.writeFile(workbook, fileName);
+                    showToast('Xuất Excel thành công', `Đã tải xuống file ${fileName}`, 'success');
+                };
+
+                const copyGasScript = () => {
+                    navigator.clipboard?.writeText(gasScriptCode);
+                    copiedScript.value = true;
+                    setTimeout(() => { copiedScript.value = false; }, 2000);
+                };
+
+                onMounted(() => {
+                    // Initialize registrations as empty
+                    registrations.value = {};
+
+                    const cachedSubs = localStorage.getItem('local_subs');
+                    if (cachedSubs) {
+                        try { subjects.value = JSON.parse(cachedSubs); } catch(e) {}
+                    } else {
+                        subjects.value = [];
+                    }
+
+                    // Clear sample/demo students data
+                    students.value = [];
+
+                    // Auto load if saved link exists
+                    if (sheetUrlInput.value) {
+                        loadDataFromSheetUrl();
+                    }
+                });
+
+                return {
+                    currentRole, adminTab, sheetUrlInput, gasUrlInput, sheetId, loading, saving,
+                    toast, showInstructionsModal, activeStudentModal, tempStudentSubjects,
+                    students, subjects, activeSubjects, registrations, selectedClass, searchQuery, selectedSubjectFilter,
+                    selectedStudentIds, selectedBulkSubjectId, hideEmptySubjects, displayedSubjects, editingSubject, subjectForm, copiedScript, gasScriptCode,
+                    uniqueClasses, filteredStudents, isAllSelected, totalRegistrationsCount, hiddenOrUnknownRegistrationsCount,
+                    classStatistics, overallRegisteredStudentsCount, overallUnregisteredStudentsCount, overallCompletionPercentage, exportClassStatsToExcel,
+                    loadDataFromSheetUrl, saveAllData, saveAndLoadSheetConfig, toggleSelectAll, resetFilters, getStudentRegistrations,
+                    getSubjectDisplayName, getSubjectStatusClass, getRegisteredCountForSubject, removeSubjectFromStudent, applyBulkSubject,
+                    openStudentRegisterModal, saveStudentSubjectsModal, saveSubject, editSubject, toggleSubjectVisibility, cancelSubjectEdit,
+                    deleteSubject, copyGasScript, isSubjectRegistered, toggleSubjectForStudent, exportToExcel
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
