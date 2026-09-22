@@ -45,7 +45,7 @@
                     </div>
                     <div>
                         <h1 class="font-bold text-lg leading-tight">Đăng Ký Môn Học</h1>
-                        <p class="text-xs text-slate-400">Hệ thống đồng bộ dữ liệu tự động</p>
+                        <p class="text-xs text-slate-400">Hệ thống đồng bộ dữ liệu tự động (Multi-user Safe)</p>
                     </div>
                 </div>
 
@@ -113,7 +113,7 @@
                     </div>
 
                     <div class="flex items-center space-x-2 w-full sm:w-auto">
-                        <button @click="loadDataFromSheetUrl" :disabled="loading"
+                        <button @click="loadDataFromSheetUrl(true)" :disabled="loading"
                             class="w-full sm:w-auto px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center space-x-1.5 shrink-0" title="Tải lại từ Google Sheet">
                             <i :class="loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-arrows-rotate'"></i>
                             <span>Tải lại dữ liệu</span>
@@ -133,7 +133,7 @@
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
 
-                        <!-- Select Class (Đã làm nổi bật) -->
+                        <!-- Select Class -->
                         <div class="md:col-span-3 bg-indigo-50/80 p-3 rounded-xl border-2 border-indigo-400 shadow-sm relative">
                             <label class="block text-xs font-extrabold text-indigo-900 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                                 <span class="flex items-center space-x-1.5">
@@ -193,7 +193,6 @@
                         </h2>
                         
                         <div class="flex items-center space-x-3">
-                            <!-- Toggle Hide 0-student Subjects -->
                             <label class="flex items-center space-x-1.5 text-xs text-slate-700 font-medium cursor-pointer bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 transition-all select-none">
                                 <input type="checkbox" v-model="hideEmptySubjects" class="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5">
                                 <span>Ẩn môn không có HS</span>
@@ -252,7 +251,6 @@
                                 <i v-else class="fa-solid fa-floppy-disk"></i>
                                 <span>Lưu đăng ký</span>
                             </button>
-                            <!-- Nút Xuất Excel bên phải nút Lưu Đăng Ký -->
                             <button @click="exportToExcel"
                                 class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center space-x-2">
                                 <i class="fa-solid fa-file-excel"></i>
@@ -296,7 +294,6 @@
                                         <span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md text-[11px] font-medium">{{ st.class }}</span>
                                     </td>
                                     <td class="py-3 px-4">
-                                        <!-- Registered Subject Chips -->
                                         <div class="flex flex-wrap gap-1.5">
                                             <span v-for="subId in getStudentRegistrations(st.id)" :key="subId"
                                                 class="inline-flex items-center space-x-1 border px-2 py-0.5 rounded-md text-[11px] font-medium"
@@ -312,7 +309,6 @@
                                         </div>
                                     </td>
                                     <td class="py-3 px-4 text-center">
-                                        <!-- Khi có từ 1-3 môn khả dụng: Hiển thị trực tiếp các nút đăng ký theo tên môn -->
                                         <div v-if="activeSubjects.length >= 1 && activeSubjects.length <= 3" class="flex flex-wrap items-center justify-center gap-1.5">
                                             <button v-for="sub in activeSubjects" :key="sub.id"
                                                 @click="toggleSubjectForStudent(st.id, sub.id)"
@@ -324,7 +320,6 @@
                                                 <span>{{ sub.name }}</span>
                                             </button>
                                         </div>
-                                        <!-- Khi có nhiều hơn 3 môn hoặc 0 môn: Hiển thị nút Chọn môn mặc định -->
                                         <button v-else @click="openStudentRegisterModal(st)"
                                             class="px-2.5 py-1 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700 rounded-lg text-xs font-medium transition-all">
                                             <i class="fa-solid fa-pen-to-square mr-1"></i> Chọn môn
@@ -382,28 +377,22 @@
                         </div>
 
                         <div class="space-y-5">
-                            <!-- 1. Google Sheet Link -->
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                                     1. Đường Dẫn File Google Sheet (Đọc Dữ Liệu)
                                 </label>
                                 <div class="flex flex-col sm:flex-row gap-2">
-                                    <input type="text" v-model="sheetUrlInput" placeholder="Dán link Google Sheet vào đây (VD: https://docs.google.com/spreadsheets/d/...)"
+                                    <input type="text" v-model="sheetUrlInput" placeholder="Dán link Google Sheet vào đây..."
                                         class="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all">
-                                    <button @click="loadDataFromSheetUrl" :disabled="loading"
+                                    <button @click="loadDataFromSheetUrl(true)" :disabled="loading"
                                         class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2 disabled:opacity-50 shrink-0">
                                         <i v-if="loading" class="fa-solid fa-spinner fa-spin"></i>
                                         <i v-else class="fa-solid fa-cloud-arrow-down"></i>
                                         <span>Tải Dữ Liệu Ngay</span>
                                     </button>
                                 </div>
-                                <p class="text-[11px] text-slate-500 mt-1.5 flex items-center space-x-1">
-                                    <i class="fa-solid fa-circle-info text-emerald-600"></i>
-                                    <span>Yêu cầu file Google Sheet đặt quyền chia sẻ: <strong>"Bất kỳ ai có liên kết đều có thể xem"</strong>.</span>
-                                </p>
                             </div>
 
-                            <!-- 2. Apps Script Web App Link -->
                             <div class="pt-4 border-t border-slate-100">
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                                     2. URL Google Apps Script Web App (Đồng Bộ Lưu 2 Chiều)
@@ -417,12 +406,8 @@
                                         <span>Lưu Cấu Hình</span>
                                     </button>
                                 </div>
-                                <p class="text-[11px] text-slate-500 mt-1.5">
-                                    Cho phép hệ thống ghi trực tiếp các thay đổi môn đăng ký ngược về Google Sheet.
-                                </p>
                             </div>
 
-                            <!-- Quick Stats & Actions -->
                             <div class="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
                                 <div class="flex items-center space-x-4 text-xs text-slate-600 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200">
                                     <span>Trạng thái: <strong :class="sheetId ? 'text-emerald-600' : 'text-amber-600'">{{ sheetId ? 'Đã kết nối' : 'Chưa kết nối' }}</strong></span>
@@ -594,7 +579,6 @@
 
                 <!-- SUB TAB 4: CLASS REGISTRATION STATISTICS -->
                 <div v-if="adminTab === 'stats'" class="space-y-6">
-                    <!-- Statistics Summary Cards -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
                             <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shrink-0">
@@ -637,7 +621,7 @@
                         </div>
                     </div>
 
-                    <!-- Main Matrix Table: Registration stats by Class -->
+                    <!-- Main Matrix Table -->
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                         <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
@@ -705,7 +689,6 @@
                                         </td>
                                     </tr>
                                 </tbody>
-                                <!-- Total Summary Footer Row -->
                                 <tfoot v-if="classStatistics.length > 0" class="bg-slate-100/80 font-bold text-xs border-t-2 border-slate-300 text-slate-800">
                                     <tr>
                                         <td colspan="2" class="py-3 px-4 text-right uppercase text-[11px] text-slate-600">Tổng Cộng:</td>
@@ -795,8 +778,8 @@
                     </div>
 
                     <div>
-                        <h4 class="font-bold text-slate-800 mb-1">Mã Google Apps Script (Tự động linh hoạt tên Sheet):</h4>
-                        <p class="text-slate-500 mb-2">Vào menu <em>Tiện ích mở rộng -> Apps Script</em> trong file Google Sheet, dán đoạn mã sau và Triển khai (Deploy) thành Web App:</p>
+                        <h4 class="font-bold text-slate-800 mb-1">Mã Google Apps Script Tối Ưu Nhiều Người Dùng (Sử dụng LockService):</h4>
+                        <p class="text-slate-500 mb-2">Vào menu <em>Tiện ích mở rộng -> Apps Script</em> trong file Google Sheet, dán đoạn mã sau và Triển khai lại (Deploy) thành Web App:</p>
                         
                         <div class="relative bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-[11px] overflow-x-auto">
                             <button @click="copyGasScript" class="absolute top-2 right-2 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px]">
@@ -818,15 +801,13 @@
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
 
         createApp({
             setup() {
-                // Roles & View states
-                const currentRole = ref('teacher'); // 'teacher' | 'admin'
-                const adminTab = ref('config'); // 'config' | 'subjects' | 'students' | 'stats'
+                const currentRole = ref('teacher');
+                const adminTab = ref('config');
 
-                // Connection states
                 const defaultSheetUrl = 'https://docs.google.com/spreadsheets/d/1S9FenLplzssrMwcPIF3jxHjMpzXHC_xm2534mgy5nyU/edit?usp=sharing';
                 const defaultGasUrl = 'https://script.google.com/macros/s/AKfycbwoLiP3ls6BFGAKVYaslpg3pOWCYcR8hY6gHc-tTQ6iBOBLhqTcpfWGGV_4VRMuupOO/exec';
                 const sheetUrlInput = ref(localStorage.getItem('gs_url') || defaultSheetUrl);
@@ -835,20 +816,16 @@
                 const loading = ref(false);
                 const saving = ref(false);
 
-                // Toast state
                 const toast = ref({ show: false, title: '', message: '', type: 'info' });
 
-                // Modals
                 const showInstructionsModal = ref(false);
                 const activeStudentModal = ref(null);
                 const tempStudentSubjects = ref([]);
 
-                // Core Data Structures
                 const students = ref([]);
-                const subjects = ref([]); // [{ id: 'VL10', name: 'Vật Lý 10', isHidden: false }]
-                const registrations = ref({}); // { "HS1001": ["VL10", "HH10"] }
+                const subjects = ref([]);
+                const registrations = ref({});
 
-                // Filters & Subject visibility
                 const selectedClass = ref('');
                 const searchQuery = ref('');
                 const selectedSubjectFilter = ref('');
@@ -856,12 +833,13 @@
                 const selectedBulkSubjectId = ref('');
                 const hideEmptySubjects = ref(true);
 
-                // Form editing
                 const editingSubject = ref(null);
                 const subjectForm = ref({ id: '', name: '', isHidden: false });
 
                 const copiedScript = ref(false);
+                let autoRefreshTimer = null;
 
+                // Apps Script đã tối ưu LockService & Merge Logic phòng chống ghi đè dữ liệu
                 const gasScriptCode = `function doGet(e) {
   var action = e.parameter ? e.parameter.action : '';
   if (action === 'getAllData') {
@@ -872,6 +850,15 @@
 }
 
 function doPost(e) {
+  var lock = LockService.getScriptLock();
+  try {
+    // Đợi tối đa 10 giây nếu có người dùng khác đang ghi dữ liệu cùng lúc
+    lock.waitLock(10000);
+  } catch (e) {
+    return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Hệ thống đang bận, vui lòng thử lại sau giây lát.'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   try {
     var data = JSON.parse(e.postData.contents);
     if (data.action === 'saveRegistrations' || data.action === 'saveAll') {
@@ -881,6 +868,8 @@ function doPost(e) {
     }
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({status: 'error', message: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -901,24 +890,21 @@ function getSheetByNameFlexible(ss, name) {
 function getAllData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  // 1. HocSinh
   var hsSheet = getSheetByNameFlexible(ss, "HocSinh");
   var hsData = hsSheet ? hsSheet.getDataRange().getDisplayValues() : [];
   var students = [];
   for (var i = 1; i < hsData.length; i++) {
     if (hsData[i][0]) {
-      var dobVal = hsData[i][4];
       students.push({
         id: String(hsData[i][0]).trim(),
         name: String(hsData[i][1] || '').trim(),
         class: String(hsData[i][2] || '').trim(),
         gender: String(hsData[i][3] || '').trim(),
-        dob: String(dobVal || '').trim()
+        dob: String(hsData[i][4] || '').trim()
       });
     }
   }
 
-  // 2. MonHoc
   var mhSheet = getSheetByNameFlexible(ss, "MonHoc");
   var mhData = mhSheet ? mhSheet.getDataRange().getDisplayValues() : [];
   var subjects = [];
@@ -934,7 +920,6 @@ function getAllData() {
     }
   }
 
-  // 3. DangKy
   var dkSheet = getSheetByNameFlexible(ss, "DangKy");
   var dkData = dkSheet ? dkSheet.getDataRange().getDisplayValues() : [];
   var registrations = {};
@@ -950,18 +935,33 @@ function getAllData() {
   return { status: 'success', students: students, subjects: subjects, registrations: registrations };
 }
 
-function saveRegistrations(regs) {
+function saveRegistrations(newRegs) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var dkSheet = getSheetByNameFlexible(ss, "DangKy") || ss.insertSheet("DangKy");
-  dkSheet.clear();
   
-  // Đặt tiêu đề cột
+  var existingData = dkSheet.getDataRange().getDisplayValues();
+  var currentRegs = {};
+  
+  for (var k = 1; k < existingData.length; k++) {
+    var sId = String(existingData[k][0] || '').trim();
+    var subId = String(existingData[k][1] || '').trim();
+    if (sId && subId) {
+      if (!currentRegs[sId]) currentRegs[sId] = [];
+      if (currentRegs[sId].indexOf(subId) === -1) currentRegs[sId].push(subId);
+    }
+  }
+
+  // Merge dữ liệu gửi lên vào dữ liệu đang có trên Sheet
+  for (var key in newRegs) {
+    currentRegs[key] = newRegs[key];
+  }
+
+  dkSheet.clear();
   dkSheet.appendRow(["student_id", "subject_id"]);
-  dkSheet.getRange(1, 1, 1, 2).setNumberFormat('@');
   
   var rows = [];
-  for (var sId in regs) {
-    var list = regs[sId];
+  for (var sId in currentRegs) {
+    var list = currentRegs[sId];
     if (Array.isArray(list)) {
       for (var m = 0; m < list.length; m++) {
         rows.push([String(sId), String(list[m])]);
@@ -970,7 +970,6 @@ function saveRegistrations(regs) {
   }
   if (rows.length > 0) {
     var range = dkSheet.getRange(2, 1, rows.length, 2);
-    // Ép định dạng Plain Text (@) trước khi điền dữ liệu để không bị mất số 0 ở đầu
     range.setNumberFormat('@');
     range.setValues(rows);
   }
@@ -993,20 +992,17 @@ function saveSubjects(subs) {
   }
 }`;
 
-                // Helper to extract Sheet ID from full Google Sheet URL
                 const extractSheetId = (url) => {
                     if (!url) return '';
                     const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
                     return match ? match[1] : url.trim();
                 };
 
-                // Toast Helper
                 const showToast = (title, message, type = 'info') => {
                     toast.value = { show: true, title, message, type };
                     setTimeout(() => { toast.value.show = false; }, 4000);
                 };
 
-                // Fetch Sheet Data with flexible tab name fallback
                 const fetchGvizData = async (sid, sheetName) => {
                     const possibleNames = [sheetName];
                     if (sheetName === 'DangKy') possibleNames.push('Dang Ky', 'Đăng Ký', 'Đăng ký', 'Dang_Ky');
@@ -1044,7 +1040,6 @@ function saveSubjects(subs) {
                     return [];
                 };
 
-                // Safe Registration Lookup Helper (Case-insensitive & space trimmed)
                 const getStudentRegistrations = (studentId) => {
                     if (!studentId) return [];
                     const cleanId = String(studentId).trim().toLowerCase();
@@ -1052,15 +1047,14 @@ function saveSubjects(subs) {
                     return key ? (registrations.value[key] || []) : [];
                 };
 
-                // Load Data from Google Sheet URL
-                const loadDataFromSheetUrl = async () => {
+                const loadDataFromSheetUrl = async (isManual = false) => {
                     const sid = extractSheetId(sheetUrlInput.value);
                     if (!sid) {
-                        showToast('Lỗi URL', 'Vui lòng dán liên kết Google Sheet hợp lệ.', 'error');
+                        if (isManual) showToast('Lỗi URL', 'Vui lòng dán liên kết Google Sheet hợp lệ.', 'error');
                         return;
                     }
 
-                    loading.value = true;
+                    if (isManual) loading.value = true;
                     sheetId.value = sid;
                     localStorage.setItem('gs_url', sheetUrlInput.value);
 
@@ -1069,7 +1063,6 @@ function saveSubjects(subs) {
                         let parsedSubjectsList = [];
                         let rawRegsMap = null;
 
-                        // 1. Attempt load via Google Apps Script endpoint if available
                         if (gasUrlInput.value) {
                             try {
                                 const gasRes = await fetch(`${gasUrlInput.value}?action=getAllData`);
@@ -1098,9 +1091,7 @@ function saveSubjects(subs) {
                             }
                         }
 
-                        // 2. Direct GViz Fallback if GAS was not used or failed
                         if (parsedStudentsList.length === 0) {
-                            // Fetch HocSinh
                             const hsRows = await fetchGvizData(sid, 'HocSinh');
                             let idCol = 0, nameCol = 1, classCol = 2, genderCol = 3, dobCol = 4;
                             let startHsRow = 0;
@@ -1133,7 +1124,6 @@ function saveSubjects(subs) {
                                 }
                             }
 
-                            // Fetch MonHoc
                             const mhRows = await fetchGvizData(sid, 'MonHoc');
                             let subIdCol = 0, subNameCol = 1, subHiddenCol = 2;
                             let startMhRow = 0;
@@ -1166,7 +1156,6 @@ function saveSubjects(subs) {
                                 }
                             }
 
-                            // Fetch DangKy with dynamic header detection
                             const dkRows = await fetchGvizData(sid, 'DangKy');
                             rawRegsMap = {};
                             let studentColIdx = 0;
@@ -1199,11 +1188,9 @@ function saveSubjects(subs) {
                             }
                         }
 
-                        // Update global state if parsed data valid
                         if (parsedStudentsList.length > 0) students.value = parsedStudentsList;
                         if (parsedSubjectsList.length > 0) subjects.value = parsedSubjectsList;
 
-                        // Normalize & Link Registrations
                         const normalizedRegs = {};
                         if (rawRegsMap && Object.keys(rawRegsMap).length > 0) {
                             Object.keys(rawRegsMap).forEach(sKey => {
@@ -1228,24 +1215,22 @@ function saveSubjects(subs) {
                             });
                         }
 
-                        // Set registrations directly without saving to localStorage
                         if (Object.keys(normalizedRegs).length > 0) {
                             registrations.value = normalizedRegs;
-                            showToast('Thành công', `Đã tải ${students.value.length} học sinh và dữ liệu đăng ký môn!`, 'success');
+                            if (isManual) showToast('Thành công', `Đã tải ${students.value.length} học sinh và dữ liệu đăng ký môn!`, 'success');
                         } else {
                             registrations.value = {};
-                            showToast('Thành công', `Đã tải ${students.value.length} học sinh từ Google Sheet.`, 'success');
+                            if (isManual) showToast('Thành công', `Đã tải ${students.value.length} học sinh từ Google Sheet.`, 'success');
                         }
 
                     } catch (err) {
                         console.error("Fetch Sheet Error:", err);
-                        showToast('Lỗi kết nối', 'Không thể đọc file Google Sheet. Vui lòng kiểm tra quyền chia sẻ công khai.', 'error');
+                        if (isManual) showToast('Lỗi kết nối', 'Không thể đọc file Google Sheet. Vui lòng kiểm tra quyền chia sẻ công khai.', 'error');
                     } finally {
-                        loading.value = false;
+                        if (isManual) loading.value = false;
                     }
                 };
 
-                // Save All Changes (Sync back)
                 const saveAllData = async () => {
                     localStorage.setItem('local_subs', JSON.stringify(subjects.value));
 
@@ -1263,7 +1248,8 @@ function saveSubjects(subs) {
                             });
                             const result = await response.json();
                             if (result.status === 'success') {
-                                showToast('Đồng bộ thành công', 'Đã lưu dữ liệu môn học và đăng ký trực tiếp về Google Sheet!', 'success');
+                                showToast('Đồng bộ thành công', 'Đã lưu dữ liệu trực tiếp về Google Sheet an toàn!', 'success');
+                                loadDataFromSheetUrl(false);
                             } else {
                                 throw new Error(result.message || 'Lỗi không xác định');
                             }
@@ -1279,10 +1265,9 @@ function saveSubjects(subs) {
 
                 const saveAndLoadSheetConfig = () => {
                     localStorage.setItem('gas_url', gasUrlInput.value);
-                    loadDataFromSheetUrl();
+                    loadDataFromSheetUrl(true);
                 };
 
-                // Active (Non-hidden) Subjects list for GVCN
                 const activeSubjects = computed(() => {
                     return subjects.value.filter(s => !s.isHidden);
                 });
@@ -1290,7 +1275,6 @@ function saveSubjects(subs) {
                 const classStatistics = computed(() => {
                     const stats = {};
 
-                    // Ensure classes from uniqueClasses exist in stats
                     uniqueClasses.value.forEach(cls => {
                         stats[cls] = {
                             className: cls,
@@ -1305,7 +1289,6 @@ function saveSubjects(subs) {
                         });
                     });
 
-                    // Aggregate student registration data per class
                     students.value.forEach(st => {
                         const cls = st.class || 'Khác';
                         if (!stats[cls]) {
@@ -1339,7 +1322,6 @@ function saveSubjects(subs) {
                         });
                     });
 
-                    // Calculate completion percentage rate
                     Object.values(stats).forEach(item => {
                         item.completionRate = item.totalStudents > 0
                             ? Math.round((item.registeredStudents / item.totalStudents) * 100)
@@ -1394,7 +1376,36 @@ function saveSubjects(subs) {
                     showToast('Xuất Excel thành công', `Đã tải xuống file ${fileName}`, 'success');
                 };
 
-                // Diagnostics for hidden or unknown subject registrations
+                const exportToExcel = () => {
+                    if (students.value.length === 0) {
+                        showToast('Cảnh báo', 'Không có dữ liệu học sinh để xuất file.', 'error');
+                        return;
+                    }
+
+                    const excelRows = students.value.map((st, idx) => {
+                        const registeredList = getStudentRegistrations(st.id);
+                        const registeredNames = registeredList.map(id => getSubjectDisplayName(id)).join(', ');
+
+                        return {
+                            'STT': idx + 1,
+                            'Mã Học Sinh': st.id,
+                            'Họ Và Tên': st.name,
+                            'Lớp': st.class,
+                            'Giới Tính': st.gender || '',
+                            'Ngày Sinh': st.dob || '',
+                            'Môn Đã Đăng Ký': registeredNames || 'Chưa đăng ký'
+                        };
+                    });
+
+                    const worksheet = XLSX.utils.json_to_sheet(excelRows);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'DanhSachDangKy');
+
+                    const fileName = `Danh_Sach_Dang_Ky_Mon_Hoc.xlsx`;
+                    XLSX.writeFile(workbook, fileName);
+                    showToast('Xuất Excel thành công', `Đã tải xuống file ${fileName}`, 'success');
+                };
+
                 const hiddenOrUnknownRegistrationsCount = computed(() => {
                     let count = 0;
                     const activeSubjectIds = new Set(activeSubjects.value.map(s => s.id.toLowerCase()));
@@ -1408,7 +1419,6 @@ function saveSubjects(subs) {
                     return count;
                 });
 
-                // Computed Filters
                 const uniqueClasses = computed(() => {
                     const set = new Set(students.value.map(s => s.class).filter(Boolean));
                     return Array.from(set).sort();
@@ -1432,13 +1442,12 @@ function saveSubjects(subs) {
                         return matchClass && matchQuery && matchSubject;
                     });
 
-                    // Sắp xếp các học sinh đã đăng ký môn học lên phía trên danh sách
                     return list.slice().sort((a, b) => {
                         const countA = getStudentRegistrations(a.id).length;
                         const countB = getStudentRegistrations(b.id).length;
                         if (countA > 0 && countB === 0) return -1;
                         if (countA === 0 && countB > 0) return 1;
-                        return countB - countA; // Học sinh đăng ký nhiều môn hơn xếp trước
+                        return countB - countA;
                     });
                 });
 
@@ -1457,7 +1466,6 @@ function saveSubjects(subs) {
                     return count;
                 });
 
-                // Selection Actions
                 const toggleSelectAll = () => {
                     if (isAllSelected.value) {
                         selectedStudentIds.value = [];
@@ -1473,7 +1481,6 @@ function saveSubjects(subs) {
                     selectedStudentIds.value = [];
                 };
 
-                // Subject Registration Logic & Display helpers
                 const getSubjectDisplayName = (subId) => {
                     if (!subId) return '';
                     const sub = subjects.value.find(s => String(s.id).trim().toLowerCase() === String(subId).trim().toLowerCase());
@@ -1505,7 +1512,6 @@ function saveSubjects(subs) {
                     return count;
                 };
 
-                // Computed list of displayed subjects based on hideEmptySubjects setting (for GVCN view)
                 const displayedSubjects = computed(() => {
                     const baseList = activeSubjects.value;
                     if (!hideEmptySubjects.value) return baseList;
@@ -1542,13 +1548,11 @@ function saveSubjects(subs) {
                     tempStudentSubjects.value = studentRegs.filter(id => activeSubjectIds.includes(String(id).toLowerCase()));
                 };
 
-                // Helper kiểm tra học sinh đã đăng ký môn cụ thể chưa
                 const isSubjectRegistered = (studentId, subId) => {
                     const list = getStudentRegistrations(studentId);
                     return list.some(id => String(id).toLowerCase() === String(subId).toLowerCase());
                 };
 
-                // Hàm bật/tắt trực tiếp đăng ký môn học cho học sinh
                 const toggleSubjectForStudent = (studentId, subId) => {
                     const cleanStId = String(studentId).trim().toLowerCase();
                     const existingKey = Object.keys(registrations.value).find(k => k.trim().toLowerCase() === cleanStId) || studentId;
@@ -1577,55 +1581,41 @@ function saveSubjects(subs) {
                             return !sub || sub.isHidden;
                         });
 
-                        registrations.value[existingKey] = [...hiddenOrInvalidSubjectIds, ...tempStudentSubjects.value];
-                        
+                        registrations.value[existingKey] = [...tempStudentSubjects.value, ...hiddenOrInvalidSubjectIds];
                         activeStudentModal.value = null;
-                        showToast('Cập nhật thành công', 'Đã lưu danh sách môn chọn cho học sinh.', 'success');
+                        showToast('Thành công', 'Đã cập nhật danh sách môn cho học sinh.', 'success');
                     }
                 };
 
-                // Admin Subjects Management
                 const saveSubject = () => {
-                    const cleanId = subjectForm.value.id.trim();
-                    const cleanName = subjectForm.value.name.trim();
-
-                    if (!cleanId || !cleanName) {
-                        showToast('Lỗi', 'Vui lòng nhập đầy đủ Mã và Tên môn học', 'error');
+                    if (!subjectForm.value.id || !subjectForm.value.name) {
+                        showToast('Lỗi', 'Vui lòng điền mã môn và tên môn học.', 'error');
                         return;
                     }
 
                     if (editingSubject.value) {
-                        const idx = subjects.value.findIndex(s => s.id.toLowerCase() === cleanId.toLowerCase());
-                        if (idx !== -1) {
-                            subjects.value[idx].name = cleanName;
-                            subjects.value[idx].isHidden = subjectForm.value.isHidden;
+                        const sub = subjects.value.find(s => s.id === subjectForm.value.id);
+                        if (sub) {
+                            sub.name = subjectForm.value.name;
+                            sub.isHidden = subjectForm.value.isHidden;
                         }
                         editingSubject.value = null;
+                        showToast('Cập nhật thành công', 'Đã lưu thay đổi môn học.', 'success');
                     } else {
-                        if (subjects.value.some(s => s.id.toLowerCase() === cleanId.toLowerCase())) {
-                            showToast('Lỗi', 'Mã môn học này đã tồn tại', 'error');
+                        if (subjects.value.some(s => s.id.toLowerCase() === subjectForm.value.id.toLowerCase())) {
+                            showToast('Lỗi trùng mã', 'Mã môn học này đã tồn tại.', 'error');
                             return;
                         }
-                        subjects.value.push({
-                            id: cleanId,
-                            name: cleanName,
-                            isHidden: !!subjectForm.value.isHidden
-                        });
+                        subjects.value.push({ ...subjectForm.value });
+                        showToast('Thành công', 'Đã thêm môn học mới.', 'success');
                     }
+
                     subjectForm.value = { id: '', name: '', isHidden: false };
-                    showToast('Thành công', 'Đã cập nhật danh sách môn học.', 'success');
-                    saveAllData();
                 };
 
                 const editSubject = (sub) => {
                     editingSubject.value = sub;
-                    subjectForm.value = { id: sub.id, name: sub.name, isHidden: !!sub.isHidden };
-                };
-
-                const toggleSubjectVisibility = (sub) => {
-                    sub.isHidden = !sub.isHidden;
-                    showToast('Cập nhật trạng thái', `Đã ${sub.isHidden ? 'ẩn' : 'mở hiển thị'} môn ${sub.name}`, 'info');
-                    saveAllData();
+                    subjectForm.value = { ...sub };
                 };
 
                 const cancelSubjectEdit = () => {
@@ -1633,101 +1623,100 @@ function saveSubjects(subs) {
                     subjectForm.value = { id: '', name: '', isHidden: false };
                 };
 
-                const deleteSubject = (subId) => {
-                    subjects.value = subjects.value.filter(s => s.id.toLowerCase() !== subId.toLowerCase());
-                    showToast('Đã xóa môn', `Đã xóa môn học ${subId}`, 'info');
-                    saveAllData();
+                const toggleSubjectVisibility = (sub) => {
+                    sub.isHidden = !sub.isHidden;
+                    showToast('Đã đổi trạng thái', `Môn ${sub.name} đã được ${sub.isHidden ? 'ẩn' : 'hiển thị'}.`, 'info');
                 };
 
-                const exportToExcel = () => {
-                    const listToExport = filteredStudents.value.length > 0 ? filteredStudents.value : students.value;
-                    if (listToExport.length === 0) {
-                        showToast('Cảnh báo', 'Không có dữ liệu học sinh để xuất file Excel.', 'error');
-                        return;
+                const deleteSubject = (subId) => {
+                    if (confirm(`Bạn có chắc muốn xóa môn học ${subId}? Các học sinh đã đăng ký môn này cũng sẽ bị hủy đăng ký.`)) {
+                        subjects.value = subjects.value.filter(s => s.id !== subId);
+                        Object.keys(registrations.value).forEach(stId => {
+                            registrations.value[stId] = registrations.value[stId].filter(id => id !== subId);
+                        });
+                        showToast('Đã xóa môn', `Môn học ${subId} đã bị xóa.`, 'success');
                     }
-
-                    const excelData = listToExport.map((st, idx) => {
-                        const regIds = getStudentRegistrations(st.id);
-                        const regNames = regIds.map(id => getSubjectDisplayName(id)).join(', ');
-                        const regCodes = regIds.join(', ');
-
-                        return {
-                            'STT': idx + 1,
-                            'Mã Học Sinh': st.id,
-                            'Họ Và Tên': st.name,
-                            'Lớp': st.class,
-                            'Giới Tính': st.gender || '',
-                            'Ngày Sinh': st.dob || '',
-                            'Môn Đăng Ký': regNames || 'Chưa đăng ký',
-                            'Mã Môn': regCodes || '',
-                            'Số Lượng Môn': regIds.length
-                        };
-                    });
-
-                    // Tạo Worksheet & Workbook từ SheetJS
-                    const worksheet = XLSX.utils.json_to_sheet(excelData);
-                    
-                    // Thiết lập độ rộng thích hợp cho từng cột
-                    worksheet['!cols'] = [
-                        { wch: 6 },  // STT
-                        { wch: 12 }, // Mã HS
-                        { wch: 25 }, // Họ Tên
-                        { wch: 10 }, // Lớp
-                        { wch: 10 }, // Giới tính
-                        { wch: 14 }, // Ngày sinh
-                        { wch: 40 }, // Môn đăng ký
-                        { wch: 20 }, // Mã môn
-                        { wch: 14 }  // Số lượng môn
-                    ];
-
-                    const workbook = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(workbook, worksheet, 'DanhSachDangKy');
-
-                    // Đặt tên file theo bộ lọc lớp (nếu có)
-                    const className = selectedClass.value ? `Lop_${selectedClass.value}` : 'TatCaCacLop';
-                    const fileName = `Danh_Sach_Dang_Ky_Mon_Hoc_${className}.xlsx`;
-
-                    XLSX.writeFile(workbook, fileName);
-                    showToast('Xuất Excel thành công', `Đã tải xuống file ${fileName}`, 'success');
                 };
 
                 const copyGasScript = () => {
-                    navigator.clipboard?.writeText(gasScriptCode);
+                    navigator.clipboard.writeText(gasScriptCode);
                     copiedScript.value = true;
-                    setTimeout(() => { copiedScript.value = false; }, 2000);
+                    setTimeout(() => { copiedScript.value = false; }, 2500);
                 };
 
                 onMounted(() => {
-                    // Initialize registrations as empty
-                    registrations.value = {};
+                    loadDataFromSheetUrl(false);
+                    // Tự động làm tươi dữ liệu ngầm mỗi 30 giây để cập nhật thay đổi từ những người dùng khác
+                    autoRefreshTimer = setInterval(() => {
+                        if (!saving.value && !loading.value) {
+                            loadDataFromSheetUrl(false);
+                        }
+                    }, 30000);
+                });
 
-                    const cachedSubs = localStorage.getItem('local_subs');
-                    if (cachedSubs) {
-                        try { subjects.value = JSON.parse(cachedSubs); } catch(e) {}
-                    } else {
-                        subjects.value = [];
-                    }
-
-                    // Clear sample/demo students data
-                    students.value = [];
-
-                    // Auto load if saved link exists
-                    if (sheetUrlInput.value) {
-                        loadDataFromSheetUrl();
-                    }
+                onUnmounted(() => {
+                    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
                 });
 
                 return {
-                    currentRole, adminTab, sheetUrlInput, gasUrlInput, sheetId, loading, saving,
-                    toast, showInstructionsModal, activeStudentModal, tempStudentSubjects,
-                    students, subjects, activeSubjects, registrations, selectedClass, searchQuery, selectedSubjectFilter,
-                    selectedStudentIds, selectedBulkSubjectId, hideEmptySubjects, displayedSubjects, editingSubject, subjectForm, copiedScript, gasScriptCode,
-                    uniqueClasses, filteredStudents, isAllSelected, totalRegistrationsCount, hiddenOrUnknownRegistrationsCount,
-                    classStatistics, overallRegisteredStudentsCount, overallUnregisteredStudentsCount, overallCompletionPercentage, exportClassStatsToExcel,
-                    loadDataFromSheetUrl, saveAllData, saveAndLoadSheetConfig, toggleSelectAll, resetFilters, getStudentRegistrations,
-                    getSubjectDisplayName, getSubjectStatusClass, getRegisteredCountForSubject, removeSubjectFromStudent, applyBulkSubject,
-                    openStudentRegisterModal, saveStudentSubjectsModal, saveSubject, editSubject, toggleSubjectVisibility, cancelSubjectEdit,
-                    deleteSubject, copyGasScript, isSubjectRegistered, toggleSubjectForStudent, exportToExcel
+                    currentRole,
+                    adminTab,
+                    sheetUrlInput,
+                    gasUrlInput,
+                    sheetId,
+                    loading,
+                    saving,
+                    toast,
+                    showInstructionsModal,
+                    activeStudentModal,
+                    tempStudentSubjects,
+                    students,
+                    subjects,
+                    activeSubjects,
+                    displayedSubjects,
+                    registrations,
+                    selectedClass,
+                    searchQuery,
+                    selectedSubjectFilter,
+                    selectedStudentIds,
+                    selectedBulkSubjectId,
+                    hideEmptySubjects,
+                    editingSubject,
+                    subjectForm,
+                    copiedScript,
+                    gasScriptCode,
+                    uniqueClasses,
+                    filteredStudents,
+                    isAllSelected,
+                    totalRegistrationsCount,
+                    classStatistics,
+                    overallRegisteredStudentsCount,
+                    overallUnregisteredStudentsCount,
+                    overallCompletionPercentage,
+                    hiddenOrUnknownRegistrationsCount,
+                    loadDataFromSheetUrl,
+                    saveAllData,
+                    saveAndLoadSheetConfig,
+                    getStudentRegistrations,
+                    getSubjectDisplayName,
+                    getSubjectStatusClass,
+                    getRegisteredCountForSubject,
+                    toggleSelectAll,
+                    resetFilters,
+                    removeSubjectFromStudent,
+                    applyBulkSubject,
+                    openStudentRegisterModal,
+                    isSubjectRegistered,
+                    toggleSubjectForStudent,
+                    saveStudentSubjectsModal,
+                    saveSubject,
+                    editSubject,
+                    cancelSubjectEdit,
+                    toggleSubjectVisibility,
+                    deleteSubject,
+                    copyGasScript,
+                    exportClassStatsToExcel,
+                    exportToExcel
                 };
             }
         }).mount('#app');
