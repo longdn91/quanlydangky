@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Hệ Thống Đăng Ký Môn Học - Kết Nối Google Sheet</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,59 +16,73 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         [v-cloak] { display: none !important; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Smooth scrolling for touch devices */
+        .overflow-x-auto, .overflow-y-auto {
+            -webkit-overflow-scrolling: touch;
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col pb-10 sm:pb-0">
     <div id="app" v-cloak class="flex-grow flex flex-col relative">
 
         <!-- GLOBAL LOADING OVERLAY -->
-        <div v-if="loading" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex flex-col items-center justify-center p-4 transition-all">
-            <div class="bg-white p-6 rounded-2xl shadow-2xl text-slate-800 flex flex-col items-center max-w-sm w-full text-center border border-slate-100">
-                <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                <h3 class="font-bold text-base text-slate-800 mb-1">Đang tải dữ liệu Google Sheet</h3>
-                <p class="text-xs text-slate-500">Vui lòng chờ trong giây lát, hệ thống đang đồng bộ danh sách học sinh, môn học và đăng ký...</p>
+        <div v-if="loading" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center p-4 transition-all">
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-2xl text-slate-800 flex flex-col items-center max-w-xs sm:max-w-sm w-full text-center border border-slate-100">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3 sm:mb-4"></div>
+                <h3 class="font-bold text-sm sm:text-base text-slate-800 mb-1">Đang tải dữ liệu Google Sheet</h3>
+                <p class="text-xs text-slate-500">Vui lòng chờ trong giây lát, hệ thống đang đồng bộ danh sách học sinh, môn học...</p>
             </div>
         </div>
 
         <!-- HEADER BAR -->
         <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <div class="bg-indigo-600 p-2 rounded-lg text-white">
-                        <i class="fa-solid fa-graduation-cap text-xl"></i>
+            <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-0 sm:h-16 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0">
+                <div class="flex items-center justify-between w-full sm:w-auto">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="bg-indigo-600 p-1.5 sm:p-2 rounded-lg text-white shrink-0">
+                            <i class="fa-solid fa-graduation-cap text-lg sm:text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-base sm:text-lg leading-tight">Đăng Ký Môn Học</h1>
+                            <p class="text-[10px] sm:text-xs text-slate-400">Đồng bộ tự động (Multi-user Safe)</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 class="font-bold text-lg leading-tight">Đăng Ký Môn Học</h1>
-                        <p class="text-xs text-slate-400">Hệ thống đồng bộ dữ liệu tự động (Multi-user Safe)</p>
+
+                    <!-- Status Badge (Mobile top right) -->
+                    <div class="flex sm:hidden items-center space-x-1.5 text-[11px] px-2.5 py-1 rounded-full border"
+                        :class="sheetId ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300' : 'bg-amber-950/60 border-amber-500 text-amber-300'">
+                        <span class="w-2 h-2 rounded-full" :class="sheetId ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"></span>
+                        <span class="font-medium truncate max-w-[80px]">{{ sheetId ? 'Đã nối' : 'Chưa nối' }}</span>
                     </div>
                 </div>
 
-                <div class="flex items-center space-x-3">
-                    <!-- Status Badge -->
-                    <div class="flex items-center space-x-2 text-xs px-3 py-1.5 rounded-full border transition-all"
+                <div class="flex items-center justify-between w-full sm:w-auto sm:space-x-3 pt-1 sm:pt-0 border-t border-slate-800 sm:border-0">
+                    <!-- Status Badge (Desktop) -->
+                    <div class="hidden sm:flex items-center space-x-2 text-xs px-3 py-1.5 rounded-full border transition-all"
                         :class="sheetId ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300' : 'bg-amber-950/60 border-amber-500 text-amber-300'">
                         <span class="w-2 h-2 rounded-full" :class="sheetId ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"></span>
-                        <span class="font-medium hidden sm:inline">{{ sheetId ? 'Đã kết nối Sheet' : 'Chưa gắn Sheet' }}</span>
+                        <span class="font-medium">{{ sheetId ? 'Đã kết nối Sheet' : 'Chưa gắn Sheet' }}</span>
                         <i class="fa-solid fa-link text-xs"></i>
                     </div>
 
                     <!-- Role Switcher -->
-                    <div class="bg-slate-800 p-1 rounded-lg flex border border-slate-700 text-xs">
+                    <div class="bg-slate-800 p-1 rounded-lg flex border border-slate-700 text-xs w-full sm:w-auto justify-center">
                         <button @click="currentRole = 'teacher'"
                             :class="currentRole === 'teacher' ? 'bg-indigo-600 text-white font-semibold shadow' : 'text-slate-400 hover:text-slate-200'"
-                            class="px-3 py-1 rounded-md transition-all flex items-center space-x-1">
+                            class="flex-1 sm:flex-initial px-3 py-1.5 rounded-md transition-all flex items-center justify-center space-x-1">
                             <i class="fa-solid fa-chalkboard-user"></i>
                             <span>GV Chủ Nhiệm</span>
                         </button>
                         <button @click="currentRole = 'admin'"
                             :class="currentRole === 'admin' ? 'bg-purple-600 text-white font-semibold shadow' : 'text-slate-400 hover:text-slate-200'"
-                            class="px-3 py-1 rounded-md transition-all flex items-center space-x-1">
+                            class="flex-1 sm:flex-initial px-3 py-1.5 rounded-md transition-all flex items-center justify-center space-x-1">
                             <i class="fa-solid fa-user-gear"></i>
                             <span>Quản Trị</span>
                         </button>
@@ -78,43 +92,43 @@
         </header>
 
         <!-- Toast Notification -->
-        <div v-if="toast.show" class="fixed top-20 right-4 z-50 max-w-sm w-full bg-white rounded-xl shadow-2xl border p-4 transition-all transform duration-300"
+        <div v-if="toast.show" class="fixed top-16 sm:top-20 inset-x-3 sm:inset-x-auto sm:right-4 z-50 sm:max-w-sm w-auto bg-white rounded-xl shadow-2xl border p-3.5 transition-all transform duration-300"
             :class="toast.type === 'error' ? 'border-red-500 text-red-700' : (toast.type === 'success' ? 'border-emerald-500 text-emerald-700' : 'border-indigo-500 text-indigo-700')">
             <div class="flex items-start space-x-3">
                 <i :class="toast.type === 'error' ? 'fa-solid fa-circle-exclamation text-red-500 text-lg' : (toast.type === 'success' ? 'fa-solid fa-circle-check text-emerald-500 text-lg' : 'fa-solid fa-circle-info text-indigo-500 text-lg')"></i>
                 <div class="flex-1">
-                    <p class="text-sm font-semibold">{{ toast.title }}</p>
-                    <p class="text-xs mt-0.5 opacity-90">{{ toast.message }}</p>
+                    <p class="text-xs sm:text-sm font-semibold">{{ toast.title }}</p>
+                    <p class="text-[11px] sm:text-xs mt-0.5 opacity-90">{{ toast.message }}</p>
                 </div>
-                <button @click="toast.show = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+                <button @click="toast.show = false" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark"></i></button>
             </div>
         </div>
 
         <!-- MAIN CONTAINER -->
-        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+        <main class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex-grow w-full">
 
             <!-- VIEW 1: GIÁO VIÊN CHỦ NHIỆM -->
-            <div v-if="currentRole === 'teacher'" class="space-y-6">
+            <div v-if="currentRole === 'teacher'" class="space-y-4 sm:space-y-6">
 
                 <!-- Save Action Header Bar for Teacher -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                     <div class="flex items-center space-x-3">
-                        <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                        <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm shrink-0">
                             <i class="fa-solid fa-clipboard-user"></i>
                         </div>
                         <div>
-                            <h2 class="text-sm font-bold text-slate-800">Cổng Đăng Ký Dành Cho Giáo Viên</h2>
-                            <p class="text-xs text-slate-500">
-                                Tổng số: <strong class="text-slate-700">{{ students.length }}</strong> học sinh | 
-                                <strong class="text-slate-700">{{ activeSubjects.length }}</strong> môn khả dụng | 
-                                <strong class="text-indigo-600">{{ totalRegistrationsCount }}</strong> lượt đăng ký
+                            <h2 class="text-xs sm:text-sm font-bold text-slate-800">Cổng Đăng Ký Giáo Viên</h2>
+                            <p class="text-[11px] sm:text-xs text-slate-500">
+                                HS: <strong class="text-slate-700">{{ students.length }}</strong> | 
+                                Môn: <strong class="text-slate-700">{{ activeSubjects.length }}</strong> | 
+                                Đăng ký: <strong class="text-indigo-600">{{ totalRegistrationsCount }}</strong>
                             </p>
                         </div>
                     </div>
 
                     <div class="flex items-center space-x-2 w-full sm:w-auto">
                         <button @click="loadDataFromSheetUrl(true)" :disabled="loading"
-                            class="w-full sm:w-auto px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center space-x-1.5 shrink-0" title="Tải lại từ Google Sheet">
+                            class="w-full sm:w-auto px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center space-x-1.5 shrink-0" title="Tải lại từ Google Sheet">
                             <i :class="loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-arrows-rotate'"></i>
                             <span>Tải lại dữ liệu</span>
                         </button>
@@ -122,60 +136,61 @@
                 </div>
 
                 <!-- Diagnostic Alert for Unmatched or Hidden Registrations -->
-                <div v-if="hiddenOrUnknownRegistrationsCount > 0" class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-xs flex items-center justify-between">
-                    <div class="flex items-center space-x-2">
-                        <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm"></i>
-                        <span>Phát hiện <strong>{{ hiddenOrUnknownRegistrationsCount }}</strong> đăng ký thuộc môn học bị Ẩn hoặc mã môn không hợp lệ. Quản trị viên có thể kiểm tra ở tab Quản Trị.</span>
+                <div v-if="hiddenOrUnknownRegistrationsCount > 0" class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-xs flex items-start sm:items-center justify-between gap-2">
+                    <div class="flex items-start sm:items-center space-x-2">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm mt-0.5 sm:mt-0"></i>
+                        <span>Phát hiện <strong>{{ hiddenOrUnknownRegistrationsCount }}</strong> đăng ký môn bị Ẩn/mã không hợp lệ. Quản trị viên có thể kiểm tra tab Quản Trị.</span>
                     </div>
                 </div>
 
                 <!-- Filter & Controls Toolbar -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 sm:p-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 sm:gap-4 items-end">
 
                         <!-- Select Class -->
-                        <div class="md:col-span-3 bg-indigo-50/80 p-3 rounded-xl border-2 border-indigo-400 shadow-sm relative">
-                            <label class="block text-xs font-extrabold text-indigo-900 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <div class="md:col-span-3 bg-indigo-50/80 p-2.5 sm:p-3 rounded-xl border-2 border-indigo-400 shadow-sm relative">
+                            <label class="block text-[11px] sm:text-xs font-extrabold text-indigo-900 uppercase tracking-wider mb-1 flex items-center justify-between">
                                 <span class="flex items-center space-x-1.5">
                                     <i class="fa-solid fa-filter text-indigo-600"></i>
                                     <span>CHỌN LỚP</span>
                                 </span>
-                                <span class="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">Nổi bật</span>
+                                <span class="bg-indigo-600 text-white text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full">Nổi bật</span>
                             </label>
-                            <select v-model="selectedClass" class="w-full bg-white border-2 border-indigo-500 rounded-lg px-3 py-2 text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-600 focus:outline-none shadow-sm cursor-pointer">
-                                <option value="" class="font-medium text-slate-700">-- Tất cả các lớp ({{ uniqueClasses.length }}) --</option>
+                            <select v-model="selectedClass" class="w-full bg-white border-2 border-indigo-500 rounded-lg px-2.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm cursor-pointer">
+                                <option value="" class="font-medium text-slate-700">-- Tất cả lớp ({{ uniqueClasses.length }}) --</option>
                                 <option v-for="c in uniqueClasses" :key="c" :value="c" class="font-bold text-indigo-900">Lớp {{ c }}</option>
                             </select>
                         </div>
 
                         <!-- Search Student -->
                         <div class="md:col-span-4">
-                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                            <label class="block text-[11px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
                                 Tìm kiếm học sinh
                             </label>
                             <div class="relative">
-                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
-                                <input type="text" v-model="searchQuery" placeholder="Nhập mã hoặc tên học sinh..."
-                                    class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs sm:text-sm"></i>
+                                <input type="text" v-model="searchQuery" placeholder="Nhập mã hoặc tên..."
+                                    class="w-full pl-8 sm:pl-9 pr-3 py-1.5 sm:py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none">
                             </div>
                         </div>
 
                         <!-- Filter Subject -->
                         <div class="md:col-span-3">
-                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                                Lọc theo Môn Học
+                            <label class="block text-[11px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                Lọc Môn Học
                             </label>
-                            <select v-model="selectedSubjectFilter" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none">
-                                <option value="">-- Tất cả môn học --</option>
-                                <option value="unregistered">-- Chưa đăng ký môn nào --</option>
+                            <select v-model="selectedSubjectFilter" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none">
+                                <option value="">-- Tất cả môn --</option>
+                                <option value="unregistered">-- Chưa đăng ký --</option>
                                 <option v-for="sub in activeSubjects" :key="sub.id" :value="sub.id">{{ sub.name }} ({{ sub.id }})</option>
                             </select>
                         </div>
 
                         <!-- Reset Filter -->
-                        <div class="md:col-span-2 flex items-end">
-                            <button @click="resetFilters" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-all">
-                                <i class="fa-solid fa-rotate-left mr-1"></i> Đặt lại
+                        <div class="md:col-span-2">
+                            <button @click="resetFilters" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-1">
+                                <i class="fa-solid fa-rotate-left"></i>
+                                <span>Đặt lại</span>
                             </button>
                         </div>
                     </div>
@@ -184,36 +199,35 @@
                 <!-- Subjects Selection Grid -->
                 <div>
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                        <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-2">
+                        <h2 class="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-2">
                             <i class="fa-solid fa-book-bookmark text-indigo-600"></i>
-                            <span>Danh Sách Môn Học Khả Dụng ({{ displayedSubjects.length }}/{{ activeSubjects.length }})</span>
-                            <span v-if="selectedClass" class="text-xs normal-case font-normal text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                            <span>Môn Khả Dụng ({{ displayedSubjects.length }}/{{ activeSubjects.length }})</span>
+                            <span v-if="selectedClass" class="text-[11px] normal-case font-normal text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                                 Lớp {{ selectedClass }}
                             </span>
                         </h2>
                         
-                        <div class="flex items-center space-x-3">
-                            <label class="flex items-center space-x-1.5 text-xs text-slate-700 font-medium cursor-pointer bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 transition-all select-none">
+                        <div class="flex items-center justify-between sm:justify-end space-x-3">
+                            <label class="flex items-center space-x-1.5 text-xs text-slate-700 font-medium cursor-pointer bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-200 transition-all select-none">
                                 <input type="checkbox" v-model="hideEmptySubjects" class="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5">
-                                <span>Ẩn môn không có HS</span>
+                                <span>Ẩn môn 0 HS</span>
                             </label>
-                            <span class="text-xs text-slate-500 hidden sm:inline">Chọn HS bên dưới rồi bấm gán môn</span>
                         </div>
                     </div>
 
-                    <div v-if="displayedSubjects.length === 0" class="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center text-amber-800 text-sm">
-                        <span v-if="activeSubjects.length === 0">Chưa có môn học khả dụng nào. Vui lòng chuyển sang tab <strong>Quản Trị</strong> để mở hoặc thêm môn học.</span>
-                        <span v-else>Không có môn học nào có học sinh đăng ký trong bộ lọc hiện tại. <br><button @click="hideEmptySubjects = false" class="text-indigo-600 font-semibold hover:underline mt-1">Bỏ tích "Ẩn môn không có HS"</button> để xem tất cả môn.</span>
+                    <div v-if="displayedSubjects.length === 0" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-6 text-center text-amber-800 text-xs sm:text-sm">
+                        <span v-if="activeSubjects.length === 0">Chưa có môn học khả dụng. Chuyển sang tab <strong>Quản Trị</strong> để mở môn.</span>
+                        <span v-else>Không tìm thấy môn nào theo bộ lọc. <br><button @click="hideEmptySubjects = false" class="text-indigo-600 font-semibold hover:underline mt-1">Bỏ tích "Ẩn môn 0 HS"</button> để xem tất cả.</span>
                     </div>
 
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-3">
                         <div v-for="sub in displayedSubjects" :key="sub.id"
-                            class="bg-white border rounded-xl p-3 shadow-sm hover:shadow-md transition-all relative group flex flex-col justify-between"
+                            class="bg-white border rounded-xl p-2.5 sm:p-3 shadow-sm hover:shadow-md transition-all relative group flex flex-col justify-between"
                             :class="selectedBulkSubjectId === sub.id ? 'border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/30' : 'border-slate-200'">
                             <div>
                                 <div class="flex items-center justify-between mb-1">
-                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">{{ sub.id }}</span>
-                                    <span class="text-[11px] font-semibold" :class="getRegisteredCountForSubject(sub.id) > 0 ? 'text-indigo-600' : 'text-slate-400'">
+                                    <span class="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono truncate max-w-[60px] sm:max-w-none">{{ sub.id }}</span>
+                                    <span class="text-[10px] sm:text-[11px] font-semibold" :class="getRegisteredCountForSubject(sub.id) > 0 ? 'text-indigo-600' : 'text-slate-400'">
                                         {{ getRegisteredCountForSubject(sub.id) }} HS
                                     </span>
                                 </div>
@@ -221,46 +235,92 @@
                             </div>
 
                             <button @click="applyBulkSubject(sub.id)" :disabled="selectedStudentIds.length === 0"
-                                class="mt-2 w-full py-1 text-[11px] font-semibold rounded-lg transition-all flex items-center justify-center space-x-1"
-                                :class="selectedStudentIds.length > 0 ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-400 cursor-not-allowed'">
-                                <i class="fa-solid fa-plus text-[10px]"></i>
+                                class="mt-2 w-full py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-lg transition-all flex items-center justify-center space-x-1"
+                                :class="selectedStudentIds.length > 0 ? 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'">
+                                <i class="fa-solid fa-plus text-[9px]"></i>
                                 <span>Gán cho {{ selectedStudentIds.length }} HS</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Student Table Section -->
+                <!-- Student Table & Cards Section -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div class="flex items-center space-x-3">
+                    <div class="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center justify-between sm:justify-start space-x-3 w-full sm:w-auto">
                             <label class="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer">
                                 <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
                                 <span>Chọn tất cả ({{ filteredStudents.length }})</span>
                             </label>
-                            <span v-if="selectedStudentIds.length > 0" class="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2.5 py-0.5 rounded-full">
-                                Đã chọn {{ selectedStudentIds.length }} học sinh
+                            <span v-if="selectedStudentIds.length > 0" class="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full">
+                                Đã chọn {{ selectedStudentIds.length }}
                             </span>
                         </div>
 
-                        <div class="flex items-center justify-between sm:justify-end space-x-3 w-full sm:w-auto">
-                            <span class="text-xs text-slate-500 hidden sm:inline">Hiển thị {{ filteredStudents.length }} / {{ students.length }} học sinh</span>
+                        <div class="grid grid-cols-2 sm:flex items-center justify-end gap-2 w-full sm:w-auto">
                             <button @click="saveAllData" :disabled="saving"
-                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center space-x-2 disabled:opacity-50">
+                                class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50">
                                 <i v-if="saving" class="fa-solid fa-spinner fa-spin"></i>
                                 <i v-else class="fa-solid fa-floppy-disk"></i>
                                 <span>Lưu đăng ký</span>
                             </button>
                             <button @click="exportToExcel"
-                                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center space-x-2">
+                                class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center space-x-1.5">
                                 <i class="fa-solid fa-file-excel"></i>
                                 <span>Xuất Excel</span>
                             </button>
                         </div>
                     </div>
 
-                    <!-- Table -->
-                    <div class="overflow-x-auto custom-scrollbar">
+                    <!-- MOBILE CARD VIEW (Hiển thị trên điện thoại) -->
+                    <div class="block lg:hidden divide-y divide-slate-100">
+                        <div v-if="filteredStudents.length === 0" class="p-6 text-center text-slate-400 text-xs">
+                            <i class="fa-solid fa-user-slash text-2xl mb-2 block"></i>
+                            <span v-if="students.length === 0">Chưa có dữ liệu học sinh. Tải từ Google Sheet.</span>
+                            <span v-else>Không tìm thấy học sinh phù hợp.</span>
+                        </div>
+
+                        <div v-for="(st, idx) in filteredStudents" :key="'card-'+st.id" 
+                            class="p-3.5 transition-all space-y-2.5"
+                            :class="selectedStudentIds.includes(st.id) ? 'bg-indigo-50/40' : ''">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex items-center space-x-2.5">
+                                    <input type="checkbox" :value="st.id" v-model="selectedStudentIds" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer mt-0.5">
+                                    <div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-bold text-xs text-slate-800">{{ st.name }}</span>
+                                            <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-medium">Lớp {{ st.class }}</span>
+                                        </div>
+                                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">STT: {{ idx + 1 }} | ID: {{ st.id }}</p>
+                                    </div>
+                                </div>
+                                <button @click="openStudentRegisterModal(st)" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold transition-all shrink-0">
+                                    <i class="fa-solid fa-pen-to-square mr-1"></i>Đổi môn
+                                </button>
+                            </div>
+
+                            <!-- Registered Subjects Tags -->
+                            <div class="pl-6">
+                                <p class="text-[10px] text-slate-400 font-semibold mb-1">MÔN ĐÃ ĐĂNG KÝ:</p>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <span v-for="subId in getStudentRegistrations(st.id)" :key="subId"
+                                        class="inline-flex items-center space-x-1 border px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-medium"
+                                        :class="getSubjectStatusClass(subId)">
+                                        <span>{{ getSubjectDisplayName(subId) }}</span>
+                                        <button @click="removeSubjectFromStudent(st.id, subId)" class="hover:text-red-600 ml-1 text-[9px]" title="Xóa">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </span>
+                                    <span v-if="getStudentRegistrations(st.id).length === 0" class="text-slate-400 italic text-[11px]">
+                                        Chưa đăng ký môn nào
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DESKTOP TABLE VIEW (Hiển thị trên máy tính/màn hình rộng) -->
+                    <div class="hidden lg:block overflow-x-auto custom-scrollbar">
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr class="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -333,101 +393,101 @@
             </div>
 
             <!-- VIEW 2: QUẢN TRỊ VIÊN -->
-            <div v-if="currentRole === 'admin'" class="space-y-6">
+            <div v-if="currentRole === 'admin'" class="space-y-4 sm:space-y-6">
 
                 <!-- Admin Navigation Tabs -->
-                <div class="flex border-b border-slate-200 space-x-6 text-sm font-semibold overflow-x-auto">
+                <div class="flex border-b border-slate-200 space-x-4 sm:space-x-6 text-xs sm:text-sm font-semibold overflow-x-auto custom-scrollbar pb-1">
                     <button @click="adminTab = 'config'"
                         :class="adminTab === 'config' ? 'border-b-2 border-purple-600 text-purple-600' : 'text-slate-500 hover:text-slate-800'"
-                        class="pb-3 transition-all flex items-center space-x-2 shrink-0">
+                        class="pb-2.5 transition-all flex items-center space-x-1.5 shrink-0">
                         <i class="fa-solid fa-file-excel"></i>
                         <span>Kết Nối Google Sheet</span>
                     </button>
                     <button @click="adminTab = 'subjects'"
                         :class="adminTab === 'subjects' ? 'border-b-2 border-purple-600 text-purple-600' : 'text-slate-500 hover:text-slate-800'"
-                        class="pb-3 transition-all flex items-center space-x-2 shrink-0">
+                        class="pb-2.5 transition-all flex items-center space-x-1.5 shrink-0">
                         <i class="fa-solid fa-book"></i>
-                        <span>Quản Lý Môn Học ({{ subjects.length }})</span>
+                        <span>Môn Học ({{ subjects.length }})</span>
                     </button>
                     <button @click="adminTab = 'students'"
                         :class="adminTab === 'students' ? 'border-b-2 border-purple-600 text-purple-600' : 'text-slate-500 hover:text-slate-800'"
-                        class="pb-3 transition-all flex items-center space-x-2 shrink-0">
+                        class="pb-2.5 transition-all flex items-center space-x-1.5 shrink-0">
                         <i class="fa-solid fa-user-graduate"></i>
-                        <span>Quản Lý Học Sinh ({{ students.length }})</span>
+                        <span>Học Sinh ({{ students.length }})</span>
                     </button>
                     <button @click="adminTab = 'stats'"
                         :class="adminTab === 'stats' ? 'border-b-2 border-purple-600 text-purple-600' : 'text-slate-500 hover:text-slate-800'"
-                        class="pb-3 transition-all flex items-center space-x-2 shrink-0">
+                        class="pb-2.5 transition-all flex items-center space-x-1.5 shrink-0">
                         <i class="fa-solid fa-chart-column"></i>
-                        <span>Thống Kê Theo Lớp</span>
+                        <span>Thống Kê Lớp</span>
                     </button>
                 </div>
 
                 <!-- SUB TAB 1: GOOGLE SHEET CONFIGURATION -->
-                <div v-if="adminTab === 'config'" class="space-y-6">
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div v-if="adminTab === 'config'" class="space-y-4 sm:space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
                         <div class="flex items-center space-x-3 mb-4 pb-4 border-b border-slate-100">
-                            <div class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
-                                <i class="fa-solid fa-file-excel text-xl"></i>
+                            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                                <i class="fa-solid fa-file-excel text-lg sm:text-xl"></i>
                             </div>
                             <div>
-                                <h3 class="font-bold text-slate-800 text-base">Cấu Hình Liên Kết Google Sheet</h3>
+                                <h3 class="font-bold text-slate-800 text-sm sm:text-base">Cấu Hình Liên Kết Google Sheet</h3>
                                 <p class="text-xs text-slate-500">Quản lý nguồn dữ liệu học sinh, môn học và đăng ký</p>
                             </div>
                         </div>
 
-                        <div class="space-y-5">
+                        <div class="space-y-4 sm:space-y-5">
                             <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                <label class="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                                     1. Đường Dẫn File Google Sheet (Đọc Dữ Liệu)
                                 </label>
                                 <div class="flex flex-col sm:flex-row gap-2">
-                                    <input type="text" v-model="sheetUrlInput" placeholder="Dán link Google Sheet vào đây..."
-                                        class="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all">
+                                    <input type="text" v-model="sheetUrlInput" placeholder="Dán link Google Sheet..."
+                                        class="flex-1 px-3 py-2 sm:py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all">
                                     <button @click="loadDataFromSheetUrl(true)" :disabled="loading"
-                                        class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2 disabled:opacity-50 shrink-0">
+                                        class="px-4 py-2 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2 disabled:opacity-50 shrink-0">
                                         <i v-if="loading" class="fa-solid fa-spinner fa-spin"></i>
                                         <i v-else class="fa-solid fa-cloud-arrow-down"></i>
-                                        <span>Tải Dữ Liệu Ngay</span>
+                                        <span>Tải Dữ Liệu</span>
                                     </button>
                                 </div>
                             </div>
 
-                            <div class="pt-4 border-t border-slate-100">
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                                    2. URL Google Apps Script Web App (Đồng Bộ Lưu 2 Chiều)
+                            <div class="pt-3 sm:pt-4 border-t border-slate-100">
+                                <label class="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    2. URL Apps Script Web App (Lưu 2 Chiều)
                                 </label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input type="text" v-model="gasUrlInput" placeholder="VD: https://script.google.com/macros/s/.../exec"
-                                        class="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all">
+                                        class="flex-1 px-3 py-2 sm:py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all">
                                     <button @click="saveAndLoadSheetConfig" :disabled="loading"
-                                        class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2 shrink-0">
+                                        class="px-4 py-2 sm:py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2 shrink-0">
                                         <i class="fa-solid fa-floppy-disk"></i>
                                         <span>Lưu Cấu Hình</span>
                                     </button>
                                 </div>
                             </div>
 
-                            <div class="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
-                                <div class="flex items-center space-x-4 text-xs text-slate-600 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200">
-                                    <span>Trạng thái: <strong :class="sheetId ? 'text-emerald-600' : 'text-amber-600'">{{ sheetId ? 'Đã kết nối' : 'Chưa kết nối' }}</strong></span>
+                            <div class="pt-3 sm:pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                                <div class="flex items-center justify-around sm:justify-start space-x-2 sm:space-x-4 text-[11px] sm:text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                    <span>Trạng thái: <strong :class="sheetId ? 'text-emerald-600' : 'text-amber-600'">{{ sheetId ? 'Đã nối' : 'Chưa nối' }}</strong></span>
                                     <span>|</span>
-                                    <span>Học sinh: <strong class="text-slate-800">{{ students.length }}</strong></span>
+                                    <span>HS: <strong class="text-slate-800">{{ students.length }}</strong></span>
                                     <span>|</span>
-                                    <span>Môn học: <strong class="text-slate-800">{{ subjects.length }}</strong></span>
+                                    <span>Môn: <strong class="text-slate-800">{{ subjects.length }}</strong></span>
                                 </div>
 
-                                <div class="flex items-center space-x-2">
+                                <div class="grid grid-cols-2 sm:flex items-center space-x-0 sm:space-x-2 gap-2">
                                     <button @click="saveAllData" :disabled="saving"
-                                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center space-x-2 disabled:opacity-50">
+                                        class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50">
                                         <i v-if="saving" class="fa-solid fa-spinner fa-spin"></i>
                                         <i v-else class="fa-solid fa-rotate"></i>
-                                        <span>Đồng bộ thủ công về Sheet</span>
+                                        <span>Đồng bộ về Sheet</span>
                                     </button>
 
-                                    <button @click="showInstructionsModal = true" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center space-x-1">
+                                    <button @click="showInstructionsModal = true" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center space-x-1">
                                         <i class="fa-solid fa-circle-question text-purple-600"></i>
-                                        <span>Xem Hướng Dẫn & Code Apps Script</span>
+                                        <span>Hướng Dẫn</span>
                                     </button>
                                 </div>
                             </div>
@@ -436,26 +496,26 @@
                 </div>
 
                 <!-- SUB TAB 2: SUBJECTS MANAGEMENT -->
-                <div v-if="adminTab === 'subjects'" class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <div v-if="adminTab === 'subjects'" class="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
 
                     <!-- Form Add Subject -->
-                    <div class="md:col-span-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 h-fit">
-                        <h3 class="font-bold text-slate-800 text-sm mb-4 flex items-center space-x-2">
+                    <div class="md:col-span-4 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 h-fit">
+                        <h3 class="font-bold text-slate-800 text-xs sm:text-sm mb-3 sm:mb-4 flex items-center space-x-2">
                             <i class="fa-solid fa-circle-plus text-purple-600"></i>
                             <span>{{ editingSubject ? 'Sửa Môn Học' : 'Thêm Môn Học Mới' }}</span>
                         </h3>
 
                         <form @submit.prevent="saveSubject" class="space-y-3">
                             <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Mã Môn Học</label>
-                                <input type="text" v-model="subjectForm.id" :disabled="!!editingSubject" placeholder="VD: VL10, HH10, TH10..."
-                                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none disabled:opacity-60 font-mono">
+                                <label class="block text-[11px] sm:text-xs font-semibold text-slate-500 uppercase mb-1">Mã Môn Học</label>
+                                <input type="text" v-model="subjectForm.id" :disabled="!!editingSubject" placeholder="VD: VL10, HH10..."
+                                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none disabled:opacity-60 font-mono">
                             </div>
 
                             <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Tên Môn Học</label>
-                                <input type="text" v-model="subjectForm.name" placeholder="VD: Vật Lý 10, Hóa Học 10..."
-                                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                                <label class="block text-[11px] sm:text-xs font-semibold text-slate-500 uppercase mb-1">Tên Môn Học</label>
+                                <input type="text" v-model="subjectForm.name" placeholder="VD: Vật Lý 10..."
+                                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none">
                             </div>
 
                             <div class="flex items-center space-x-2 pt-1">
@@ -478,21 +538,21 @@
 
                     <!-- Subjects Table -->
                     <div class="md:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                        <div class="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-700 uppercase">Danh sách môn học</span>
-                            <span class="text-xs text-slate-500">Cấu trúc sheet `MonHoc`: `id`, `name`, `is_hidden`</span>
+                            <span class="text-[10px] text-slate-500 hidden sm:inline">Sheet `MonHoc`: `id`, `name`, `is_hidden`</span>
                         </div>
 
-                        <div class="overflow-x-auto">
+                        <div class="overflow-x-auto custom-scrollbar">
                             <table class="w-full text-left border-collapse">
                                 <thead>
                                     <tr class="bg-slate-100/60 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-                                        <th class="py-3 px-4 w-12 text-center">STT</th>
-                                        <th class="py-3 px-4 w-28">Mã Môn</th>
-                                        <th class="py-3 px-4">Tên Môn Học</th>
-                                        <th class="py-3 px-4 w-28 text-center">Trạng Thái</th>
-                                        <th class="py-3 px-4 w-24 text-center">Số HS Chọn</th>
-                                        <th class="py-3 px-4 w-28 text-center">Thao Tác</th>
+                                        <th class="py-2.5 px-3 w-10 text-center">STT</th>
+                                        <th class="py-2.5 px-3 w-20 sm:w-28">Mã Môn</th>
+                                        <th class="py-2.5 px-3">Tên Môn Học</th>
+                                        <th class="py-2.5 px-3 w-24 text-center">Trạng Thái</th>
+                                        <th class="py-2.5 px-3 w-20 text-center">Số HS</th>
+                                        <th class="py-2.5 px-3 w-24 text-center">Thao Tác</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 text-xs">
@@ -500,32 +560,24 @@
                                         <td colspan="6" class="py-6 text-center text-slate-400">Chưa có dữ liệu môn học.</td>
                                     </tr>
                                     <tr v-for="(sub, i) in subjects" :key="sub.id" class="hover:bg-slate-50" :class="sub.isHidden ? 'bg-slate-50/60' : ''">
-                                        <td class="py-3 px-4 text-center text-slate-400 font-semibold">{{ i + 1 }}</td>
-                                        <td class="py-3 px-4 font-mono font-bold text-purple-700">{{ sub.id }}</td>
-                                        <td class="py-3 px-4 font-medium" :class="sub.isHidden ? 'text-slate-400 line-through' : 'text-slate-800'">
+                                        <td class="py-2.5 px-3 text-center text-slate-400 font-semibold">{{ i + 1 }}</td>
+                                        <td class="py-2.5 px-3 font-mono font-bold text-purple-700">{{ sub.id }}</td>
+                                        <td class="py-2.5 px-3 font-medium" :class="sub.isHidden ? 'text-slate-400 line-through' : 'text-slate-800'">
                                             {{ sub.name }}
                                         </td>
-                                        <td class="py-3 px-4 text-center">
-                                            <span v-if="sub.isHidden" class="bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-md text-[10px] font-semibold">
-                                                <i class="fa-solid fa-eye-slash mr-1"></i>Đã Ẩn
-                                            </span>
-                                            <span v-else class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-md text-[10px] font-semibold">
-                                                <i class="fa-solid fa-eye mr-1"></i>Hiển Thị
-                                            </span>
+                                        <td class="py-2.5 px-3 text-center">
+                                            <span v-if="sub.isHidden" class="bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded text-[10px] font-semibold">Ẩn</span>
+                                            <span v-else class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] font-semibold">Hiện</span>
                                         </td>
-                                        <td class="py-3 px-4 text-center">
+                                        <td class="py-2.5 px-3 text-center">
                                             <span class="bg-purple-50 text-purple-700 font-semibold px-2 py-0.5 rounded-full text-[11px]">
                                                 {{ getRegisteredCountForSubject(sub.id) }}
                                             </span>
                                         </td>
-                                        <td class="py-3 px-4 text-center space-x-2">
-                                            <button @click="toggleSubjectVisibility(sub)"
-                                                :title="sub.isHidden ? 'Hiện môn học' : 'Ẩn môn học'"
-                                                :class="sub.isHidden ? 'text-emerald-600 hover:text-emerald-800' : 'text-amber-600 hover:text-amber-800'">
-                                                <i :class="sub.isHidden ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'"></i>
-                                            </button>
-                                            <button @click="editSubject(sub)" class="text-slate-500 hover:text-purple-600" title="Sửa môn"><i class="fa-solid fa-pen"></i></button>
-                                            <button @click="deleteSubject(sub.id)" class="text-slate-500 hover:text-red-600" title="Xóa môn"><i class="fa-solid fa-trash"></i></button>
+                                        <td class="py-2.5 px-3 text-center space-x-1.5">
+                                            <button @click="toggleSubjectVisibility(sub)" class="p-1 text-slate-500 hover:text-indigo-600"><i :class="sub.isHidden ? 'fa-solid fa-eye text-emerald-600' : 'fa-solid fa-eye-slash text-amber-600'"></i></button>
+                                            <button @click="editSubject(sub)" class="p-1 text-slate-500 hover:text-purple-600"><i class="fa-solid fa-pen"></i></button>
+                                            <button @click="deleteSubject(sub.id)" class="p-1 text-slate-500 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -535,14 +587,14 @@
                 </div>
 
                 <!-- SUB TAB 3: STUDENTS MANAGEMENT -->
-                <div v-if="adminTab === 'students'" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-                    <div class="flex items-center justify-between mb-4">
+                <div v-if="adminTab === 'students'" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 sm:p-5">
+                    <div class="flex items-center justify-between mb-3.5">
                         <div>
-                            <h3 class="font-bold text-slate-800 text-sm">Danh Sách Học Sinh & Đăng Ký Tổng Hợp</h3>
-                            <p class="text-xs text-slate-500">Hiển thị toàn bộ dữ liệu khớp từ sheet `HocSinh` và `DangKy`</p>
+                            <h3 class="font-bold text-slate-800 text-xs sm:text-sm">Danh Sách Học Sinh & Đăng Ký</h3>
+                            <p class="text-[10px] sm:text-xs text-slate-500">Dữ liệu từ sheet `HocSinh` và `DangKy`</p>
                         </div>
-                        <span class="text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-lg">
-                            Tổng: {{ students.length }} học sinh
+                        <span class="text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">
+                            Tổng: {{ students.length }} HS
                         </span>
                     </div>
 
@@ -550,21 +602,21 @@
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr class="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-                                    <th class="py-3 px-4 w-14 text-center">STT</th>
-                                    <th class="py-3 px-4">Họ Và Tên</th>
-                                    <th class="py-3 px-4">Lớp</th>
-                                    <th class="py-3 px-4">Môn Đã Đăng Ký (Gồm cả môn ẩn)</th>
+                                    <th class="py-2.5 px-3 w-12 text-center">STT</th>
+                                    <th class="py-2.5 px-3 min-w-[140px]">Họ Và Tên</th>
+                                    <th class="py-2.5 px-3 w-20">Lớp</th>
+                                    <th class="py-2.5 px-3 min-w-[200px]">Môn Đã Đăng Ký</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 text-xs">
                                 <tr v-for="(st, idx) in students" :key="st.id" class="hover:bg-slate-50">
-                                    <td class="py-3 px-4 text-center font-semibold text-slate-500">{{ idx + 1 }}</td>
-                                    <td class="py-3 px-4 font-medium text-slate-800">{{ st.name }}</td>
-                                    <td class="py-3 px-4"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px]">{{ st.class }}</span></td>
-                                    <td class="py-3 px-4">
+                                    <td class="py-2.5 px-3 text-center font-semibold text-slate-500">{{ idx + 1 }}</td>
+                                    <td class="py-2.5 px-3 font-medium text-slate-800">{{ st.name }}</td>
+                                    <td class="py-2.5 px-3"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px]">{{ st.class }}</span></td>
+                                    <td class="py-2.5 px-3">
                                         <div class="flex flex-wrap gap-1">
                                             <span v-for="subId in getStudentRegistrations(st.id)" :key="subId"
-                                                class="px-2 py-0.5 rounded text-[11px] border"
+                                                class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] border"
                                                 :class="getSubjectStatusClass(subId)">
                                                 {{ getSubjectDisplayName(subId) }}
                                             </span>
@@ -578,59 +630,59 @@
                 </div>
 
                 <!-- SUB TAB 4: CLASS REGISTRATION STATISTICS -->
-                <div v-if="adminTab === 'stats'" class="space-y-6">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-                            <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shrink-0">
+                <div v-if="adminTab === 'stats'" class="space-y-4 sm:space-y-6">
+                    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                        <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3 sm:space-x-4">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
                                 <i class="fa-solid fa-school"></i>
                             </div>
                             <div>
-                                <p class="text-xs text-slate-500 font-medium">Tổng Số Lớp</p>
-                                <p class="text-xl font-bold text-slate-800">{{ uniqueClasses.length }} <span class="text-xs font-normal text-slate-500">lớp</span></p>
+                                <p class="text-[10px] sm:text-xs text-slate-500 font-medium">Tổng Số Lớp</p>
+                                <p class="text-base sm:text-xl font-bold text-slate-800">{{ uniqueClasses.length }} <span class="text-[10px] sm:text-xs font-normal text-slate-500">lớp</span></p>
                             </div>
                         </div>
 
-                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-                            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0">
+                        <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3 sm:space-x-4">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
                                 <i class="fa-solid fa-user-check"></i>
                             </div>
                             <div>
-                                <p class="text-xs text-slate-500 font-medium">Đã Đăng Ký</p>
-                                <p class="text-xl font-bold text-slate-800">{{ overallRegisteredStudentsCount }} <span class="text-xs font-normal text-slate-500">/ {{ students.length }} HS</span></p>
+                                <p class="text-[10px] sm:text-xs text-slate-500 font-medium">Đã Đăng Ký</p>
+                                <p class="text-base sm:text-xl font-bold text-slate-800">{{ overallRegisteredStudentsCount }} <span class="text-[10px] sm:text-xs font-normal text-slate-500">HS</span></p>
                             </div>
                         </div>
 
-                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-                            <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                        <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3 sm:space-x-4">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
                                 <i class="fa-solid fa-user-clock"></i>
                             </div>
                             <div>
-                                <p class="text-xs text-slate-500 font-medium">Chưa Đăng Ký</p>
-                                <p class="text-xl font-bold text-slate-800">{{ overallUnregisteredStudentsCount }} <span class="text-xs font-normal text-slate-500">HS</span></p>
+                                <p class="text-[10px] sm:text-xs text-slate-500 font-medium">Chưa Đăng Ký</p>
+                                <p class="text-base sm:text-xl font-bold text-slate-800">{{ overallUnregisteredStudentsCount }} <span class="text-[10px] sm:text-xs font-normal text-slate-500">HS</span></p>
                             </div>
                         </div>
 
-                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-                            <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shrink-0">
+                        <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3 sm:space-x-4">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
                                 <i class="fa-solid fa-chart-pie"></i>
                             </div>
                             <div>
-                                <p class="text-xs text-slate-500 font-medium">Tỷ Lệ Hoàn Thành</p>
-                                <p class="text-xl font-bold text-indigo-600">{{ overallCompletionPercentage }}%</p>
+                                <p class="text-[10px] sm:text-xs text-slate-500 font-medium">Tỷ Lệ Hoàn Thành</p>
+                                <p class="text-base sm:text-xl font-bold text-indigo-600">{{ overallCompletionPercentage }}%</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Main Matrix Table -->
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
-                                <h3 class="font-bold text-slate-800 text-sm">Bảng Thống Kê Đăng Ký Môn Học Theo Lớp</h3>
-                                <p class="text-xs text-slate-500">Tổng hợp số lượng học sinh đăng ký từng môn của từng lớp</p>
+                                <h3 class="font-bold text-slate-800 text-xs sm:text-sm">Bảng Thống Kê Theo Lớp</h3>
+                                <p class="text-[10px] sm:text-xs text-slate-500">Tổng hợp học sinh đăng ký theo từng môn</p>
                             </div>
-                            <button @click="exportClassStatsToExcel" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto">
+                            <button @click="exportClassStatsToExcel" class="px-3 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center space-x-1.5 self-start sm:self-auto">
                                 <i class="fa-solid fa-file-excel"></i>
-                                <span>Xuất Thống Kê Excel</span>
+                                <span>Xuất Excel</span>
                             </button>
                         </div>
 
@@ -638,51 +690,51 @@
                             <table class="w-full text-left border-collapse">
                                 <thead>
                                     <tr class="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-                                        <th class="py-3 px-4 w-12 text-center">STT</th>
-                                        <th class="py-3 px-4 min-w-[100px]">Lớp</th>
-                                        <th class="py-3 px-4 text-center w-24">Sĩ Số</th>
-                                        <th class="py-3 px-4 text-center w-28">Đã Đăng Ký</th>
-                                        <th class="py-3 px-4 text-center w-28">Chưa Đăng Ký</th>
-                                        <th class="py-3 px-4 min-w-[140px]">Tiến Độ</th>
-                                        <th v-for="sub in activeSubjects" :key="sub.id" class="py-3 px-3 text-center min-w-[90px]">
+                                        <th class="py-2.5 px-3 w-10 text-center">STT</th>
+                                        <th class="py-2.5 px-3 min-w-[80px]">Lớp</th>
+                                        <th class="py-2.5 px-3 text-center w-20">Sĩ Số</th>
+                                        <th class="py-2.5 px-3 text-center w-20">Đã ĐK</th>
+                                        <th class="py-2.5 px-3 text-center w-20">Chưa ĐK</th>
+                                        <th class="py-2.5 px-3 min-w-[120px]">Tiến Độ</th>
+                                        <th v-for="sub in activeSubjects" :key="sub.id" class="py-2.5 px-2.5 text-center min-w-[80px]">
                                             <span class="block font-mono text-purple-700">{{ sub.id }}</span>
-                                            <span class="text-[10px] text-slate-400 font-normal truncate max-w-[80px] inline-block" :title="sub.name">{{ sub.name }}</span>
+                                            <span class="text-[9px] text-slate-400 font-normal truncate max-w-[70px] inline-block" :title="sub.name">{{ sub.name }}</span>
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 text-xs">
                                     <tr v-if="classStatistics.length === 0">
-                                        <td :colspan="6 + activeSubjects.length" class="py-8 text-center text-slate-400">
+                                        <td :colspan="6 + activeSubjects.length" class="py-6 text-center text-slate-400">
                                             Chưa có dữ liệu lớp học.
                                         </td>
                                     </tr>
                                     <tr v-for="(clsStat, idx) in classStatistics" :key="clsStat.className" class="hover:bg-slate-50 transition-all">
-                                        <td class="py-3 px-4 text-center text-slate-400 font-semibold">{{ idx + 1 }}</td>
-                                        <td class="py-3 px-4 font-bold text-slate-800">
-                                            <span class="bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg border border-purple-200/60 font-semibold">
+                                        <td class="py-2.5 px-3 text-center text-slate-400 font-semibold">{{ idx + 1 }}</td>
+                                        <td class="py-2.5 px-3 font-bold text-slate-800">
+                                            <span class="bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-200/60 font-semibold text-[11px]">
                                                 Lớp {{ clsStat.className }}
                                             </span>
                                         </td>
-                                        <td class="py-3 px-4 text-center font-bold text-slate-700">{{ clsStat.totalStudents }}</td>
-                                        <td class="py-3 px-4 text-center">
-                                            <span class="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full text-[11px]">
+                                        <td class="py-2.5 px-3 text-center font-bold text-slate-700">{{ clsStat.totalStudents }}</td>
+                                        <td class="py-2.5 px-3 text-center">
+                                            <span class="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full text-[10px]">
                                                 {{ clsStat.registeredStudents }}
                                             </span>
                                         </td>
-                                        <td class="py-3 px-4 text-center">
-                                            <span class="font-bold px-2 py-0.5 rounded-full text-[11px]" :class="clsStat.unregisteredStudents > 0 ? 'bg-amber-50 text-amber-700' : 'text-slate-400 bg-slate-100'">
+                                        <td class="py-2.5 px-3 text-center">
+                                            <span class="font-bold px-2 py-0.5 rounded-full text-[10px]" :class="clsStat.unregisteredStudents > 0 ? 'bg-amber-50 text-amber-700' : 'text-slate-400 bg-slate-100'">
                                                 {{ clsStat.unregisteredStudents }}
                                             </span>
                                         </td>
-                                        <td class="py-3 px-4">
-                                            <div class="flex items-center space-x-2">
-                                                <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                                                    <div class="bg-indigo-600 h-2 rounded-full transition-all duration-500" :style="{ width: clsStat.completionRate + '%' }"></div>
+                                        <td class="py-2.5 px-3">
+                                            <div class="flex items-center space-x-1.5">
+                                                <div class="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                    <div class="bg-indigo-600 h-1.5 rounded-full transition-all duration-500" :style="{ width: clsStat.completionRate + '%' }"></div>
                                                 </div>
-                                                <span class="text-[11px] font-semibold text-slate-600 w-9 text-right">{{ clsStat.completionRate }}%</span>
+                                                <span class="text-[10px] font-semibold text-slate-600 w-7 text-right">{{ clsStat.completionRate }}%</span>
                                             </div>
                                         </td>
-                                        <td v-for="sub in activeSubjects" :key="sub.id" class="py-3 px-3 text-center">
+                                        <td v-for="sub in activeSubjects" :key="sub.id" class="py-2.5 px-2.5 text-center">
                                             <span class="font-semibold text-xs" :class="(clsStat.subjectCounts[sub.id] || 0) > 0 ? 'text-indigo-600 font-bold' : 'text-slate-300'">
                                                 {{ clsStat.subjectCounts[sub.id] || 0 }}
                                             </span>
@@ -691,14 +743,12 @@
                                 </tbody>
                                 <tfoot v-if="classStatistics.length > 0" class="bg-slate-100/80 font-bold text-xs border-t-2 border-slate-300 text-slate-800">
                                     <tr>
-                                        <td colspan="2" class="py-3 px-4 text-right uppercase text-[11px] text-slate-600">Tổng Cộng:</td>
-                                        <td class="py-3 px-4 text-center text-slate-900">{{ students.length }}</td>
-                                        <td class="py-3 px-4 text-center text-emerald-700">{{ overallRegisteredStudentsCount }}</td>
-                                        <td class="py-3 px-4 text-center text-amber-700">{{ overallUnregisteredStudentsCount }}</td>
-                                        <td class="py-3 px-4">
-                                            <span class="text-indigo-700">{{ overallCompletionPercentage }}%</span>
-                                        </td>
-                                        <td v-for="sub in activeSubjects" :key="sub.id" class="py-3 px-3 text-center text-purple-700">
+                                        <td colspan="2" class="py-2.5 px-3 text-right uppercase text-[10px] text-slate-600">Tổng:</td>
+                                        <td class="py-2.5 px-3 text-center text-slate-900">{{ students.length }}</td>
+                                        <td class="py-2.5 px-3 text-center text-emerald-700">{{ overallRegisteredStudentsCount }}</td>
+                                        <td class="py-2.5 px-3 text-center text-amber-700">{{ overallUnregisteredStudentsCount }}</td>
+                                        <td class="py-2.5 px-3 text-indigo-700">{{ overallCompletionPercentage }}%</td>
+                                        <td v-for="sub in activeSubjects" :key="sub.id" class="py-2.5 px-2.5 text-center text-purple-700">
                                             {{ getRegisteredCountForSubject(sub.id) }}
                                         </td>
                                     </tr>
@@ -713,25 +763,25 @@
         </main>
 
         <!-- MODAL 1: SINGLE STUDENT REGISTRATION MODAL -->
-        <div v-if="activeStudentModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
-                <div class="p-5 bg-indigo-600 text-white flex items-center justify-between">
+        <div v-if="activeStudentModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+                <div class="p-4 bg-indigo-600 text-white flex items-center justify-between shrink-0">
                     <div>
-                        <h3 class="font-bold text-base">Đăng Ký Môn Học</h3>
+                        <h3 class="font-bold text-sm sm:text-base">Đăng Ký Môn Học</h3>
                         <p class="text-xs text-indigo-100 mt-0.5">
                             HS: <strong>{{ activeStudentModal.name }}</strong> - Lớp {{ activeStudentModal.class }}
                         </p>
                     </div>
-                    <button @click="activeStudentModal = null" class="text-indigo-200 hover:text-white text-lg">
+                    <button @click="activeStudentModal = null" class="text-indigo-200 hover:text-white text-lg p-1">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
 
-                <div class="p-5 max-h-[60vh] overflow-y-auto space-y-2 custom-scrollbar">
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Tích chọn các môn học cho học sinh:</p>
+                <div class="p-4 overflow-y-auto space-y-2 custom-scrollbar flex-grow">
+                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tích chọn các môn học:</p>
 
                     <label v-for="sub in activeSubjects" :key="sub.id"
-                        class="flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:bg-slate-50"
+                        class="flex items-center justify-between p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer hover:bg-slate-50"
                         :class="tempStudentSubjects.includes(sub.id) ? 'border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-500/20' : 'border-slate-200'">
                         <div class="flex items-center space-x-3">
                             <input type="checkbox" :value="sub.id" v-model="tempStudentSubjects" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
@@ -743,11 +793,11 @@
                     </label>
                 </div>
 
-                <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end space-x-2">
-                    <button @click="activeStudentModal = null" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold">
+                <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex justify-end space-x-2 shrink-0">
+                    <button @click="activeStudentModal = null" class="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold">
                         Hủy
                     </button>
-                    <button @click="saveStudentSubjectsModal" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm">
+                    <button @click="saveStudentSubjectsModal" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm">
                         Lưu Đăng Ký
                     </button>
                 </div>
@@ -755,33 +805,33 @@
         </div>
 
         <!-- MODAL 2: INSTRUCTIONS & GOOGLE APPS SCRIPT CODE -->
-        <div v-if="showInstructionsModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-100">
-                <div class="p-5 bg-indigo-900 text-white flex items-center justify-between">
-                    <h3 class="font-bold text-base flex items-center space-x-2">
+        <div v-if="showInstructionsModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+                <div class="p-4 bg-indigo-900 text-white flex items-center justify-between shrink-0">
+                    <h3 class="font-bold text-xs sm:text-base flex items-center space-x-2">
                         <i class="fa-solid fa-book-open text-amber-400"></i>
                         <span>Hướng Dẫn Cấu Trúc Sheet & Đồng Bộ</span>
                     </h3>
-                    <button @click="showInstructionsModal = false" class="text-indigo-200 hover:text-white">
+                    <button @click="showInstructionsModal = false" class="text-indigo-200 hover:text-white p-1">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
 
-                <div class="p-6 max-h-[75vh] overflow-y-auto space-y-4 custom-scrollbar text-xs text-slate-700">
-                    <div class="bg-indigo-50 border border-indigo-200 p-4 rounded-xl">
+                <div class="p-4 sm:p-6 overflow-y-auto space-y-4 custom-scrollbar text-xs text-slate-700 flex-grow">
+                    <div class="bg-indigo-50 border border-indigo-200 p-3.5 rounded-xl">
                         <h4 class="font-bold text-indigo-900 mb-1">Cấu trúc 3 trang tính (Tabs) chuẩn trong Google Sheet:</h4>
-                        <ul class="list-disc list-inside space-y-1 font-mono text-[11px] text-indigo-800">
+                        <ul class="list-disc list-inside space-y-1 font-mono text-[10px] sm:text-[11px] text-indigo-800">
                             <li><strong>HocSinh:</strong> Cột: <code>id</code> | <code>name</code> | <code>class</code> | <code>gender</code> | <code>dob</code></li>
-                            <li><strong>MonHoc:</strong> Cột: <code>id</code> | <code>name</code> | <code>is_hidden</code> (Cột 3 chứa TRUE/FALSE)</li>
+                            <li><strong>MonHoc:</strong> Cột: <code>id</code> | <code>name</code> | <code>is_hidden</code></li>
                             <li><strong>DangKy:</strong> Cột: <code>student_id</code> | <code>subject_id</code></li>
                         </ul>
                     </div>
 
                     <div>
-                        <h4 class="font-bold text-slate-800 mb-1">Mã Google Apps Script Tối Ưu Nhiều Người Dùng (Sử dụng LockService):</h4>
+                        <h4 class="font-bold text-slate-800 mb-1">Mã Google Apps Script Tối Ưu Nhiều Người Dùng:</h4>
                         <p class="text-slate-500 mb-2">Vào menu <em>Tiện ích mở rộng -> Apps Script</em> trong file Google Sheet, dán đoạn mã sau và Triển khai lại (Deploy) thành Web App:</p>
                         
-                        <div class="relative bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-[11px] overflow-x-auto">
+                        <div class="relative bg-slate-900 text-slate-200 p-3.5 rounded-xl font-mono text-[10px] sm:text-[11px] overflow-x-auto">
                             <button @click="copyGasScript" class="absolute top-2 right-2 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px]">
                                 {{ copiedScript ? 'Đã Copy!' : 'Copy Code' }}
                             </button>
@@ -790,8 +840,8 @@
                     </div>
                 </div>
 
-                <div class="p-4 bg-slate-50 border-t border-slate-200 text-right">
-                    <button @click="showInstructionsModal = false" class="px-5 py-2 bg-indigo-600 text-white rounded-xl font-semibold">
+                <div class="p-3.5 bg-slate-50 border-t border-slate-200 text-right shrink-0">
+                    <button @click="showInstructionsModal = false" class="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-semibold">
                         Tôi Đã Hiểu
                     </button>
                 </div>
@@ -839,7 +889,6 @@
                 const copiedScript = ref(false);
                 let autoRefreshTimer = null;
 
-                // Apps Script đã tối ưu LockService & Merge Logic phòng chống ghi đè dữ liệu
                 const gasScriptCode = `function doGet(e) {
   var action = e.parameter ? e.parameter.action : '';
   if (action === 'getAllData') {
@@ -852,10 +901,9 @@
 function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
-    // Đợi tối đa 10 giây nếu có người dùng khác đang ghi dữ liệu cùng lúc
     lock.waitLock(10000);
   } catch (e) {
-    return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Hệ thống đang bận, vui lòng thử lại sau giây lát.'}))
+    return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Hệ thống đang bận, vui lòng thử lại sau.'}))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -951,7 +999,6 @@ function saveRegistrations(newRegs) {
     }
   }
 
-  // Merge dữ liệu gửi lên vào dữ liệu đang có trên Sheet
   for (var key in newRegs) {
     currentRegs[key] = newRegs[key];
   }
@@ -1034,7 +1081,7 @@ function saveSubjects(subs) {
 
                             if (rows.length > 0) return rows;
                         } catch (e) {
-                            console.warn(`Lỗi khi tải sheet ${name}:`, e);
+                            console.warn(`Lỗi sheet ${name}:`, e);
                         }
                     }
                     return [];
@@ -1087,7 +1134,7 @@ function saveSubjects(subs) {
                                     }
                                 }
                             } catch (e) {
-                                console.log("Không phản hồi Apps Script API, chuyển sang đọc GViz trực tiếp:", e);
+                                console.log("Apps Script API không phản hồi, đọc trực tiếp qua GViz:", e);
                             }
                         }
 
@@ -1225,7 +1272,7 @@ function saveSubjects(subs) {
 
                     } catch (err) {
                         console.error("Fetch Sheet Error:", err);
-                        if (isManual) showToast('Lỗi kết nối', 'Không thể đọc file Google Sheet. Vui lòng kiểm tra quyền chia sẻ công khai.', 'error');
+                        if (isManual) showToast('Lỗi kết nối', 'Không thể đọc file Google Sheet. Vui lòng kiểm tra quyền chia sẻ.', 'error');
                     } finally {
                         if (isManual) loading.value = false;
                     }
@@ -1248,18 +1295,18 @@ function saveSubjects(subs) {
                             });
                             const result = await response.json();
                             if (result.status === 'success') {
-                                showToast('Đồng bộ thành công', 'Đã lưu dữ liệu trực tiếp về Google Sheet an toàn!', 'success');
+                                showToast('Đồng bộ thành công', 'Đã lưu dữ liệu trực tiếp về Google Sheet!', 'success');
                                 loadDataFromSheetUrl(false);
                             } else {
                                 throw new Error(result.message || 'Lỗi không xác định');
                             }
                         } catch (e) {
-                            showToast('Lưu không thành công', 'Không thể kết nối đến Google Apps Script để lưu dữ liệu.', 'error');
+                            showToast('Lưu không thành công', 'Không thể kết nối Apps Script để lưu.', 'error');
                         } finally {
                             saving.value = false;
                         }
                     } else {
-                        showToast('Thông báo', 'Cần nhập URL Apps Script để đồng bộ dữ liệu về Google Sheet.', 'info');
+                        showToast('Thông báo', 'Cần nhập URL Apps Script để lưu về Google Sheet.', 'info');
                     }
                 };
 
@@ -1484,8 +1531,8 @@ function saveSubjects(subs) {
                 const getSubjectDisplayName = (subId) => {
                     if (!subId) return '';
                     const sub = subjects.value.find(s => String(s.id).trim().toLowerCase() === String(subId).trim().toLowerCase());
-                    if (!sub) return `${subId} (Mã không tồn tại)`;
-                    if (sub.isHidden) return `${sub.name} (Đã ẩn)`;
+                    if (!sub) return `${subId} (Mã lỗi)`;
+                    if (sub.isHidden) return `${sub.name} (Ẩn)`;
                     return sub.name;
                 };
 
@@ -1583,13 +1630,13 @@ function saveSubjects(subs) {
 
                         registrations.value[existingKey] = [...tempStudentSubjects.value, ...hiddenOrInvalidSubjectIds];
                         activeStudentModal.value = null;
-                        showToast('Thành công', 'Đã cập nhật danh sách môn cho học sinh.', 'success');
+                        showToast('Thành công', 'Đã cập nhật môn học cho học sinh.', 'success');
                     }
                 };
 
                 const saveSubject = () => {
                     if (!subjectForm.value.id || !subjectForm.value.name) {
-                        showToast('Lỗi', 'Vui lòng điền mã môn và tên môn học.', 'error');
+                        showToast('Lỗi', 'Vui lòng điền mã môn và tên môn.', 'error');
                         return;
                     }
 
@@ -1625,11 +1672,11 @@ function saveSubjects(subs) {
 
                 const toggleSubjectVisibility = (sub) => {
                     sub.isHidden = !sub.isHidden;
-                    showToast('Đã đổi trạng thái', `Môn ${sub.name} đã được ${sub.isHidden ? 'ẩn' : 'hiển thị'}.`, 'info');
+                    showToast('Đã đổi trạng thái', `Môn ${sub.name} đã ${sub.isHidden ? 'ẩn' : 'hiển thị'}.`, 'info');
                 };
 
                 const deleteSubject = (subId) => {
-                    if (confirm(`Bạn có chắc muốn xóa môn học ${subId}? Các học sinh đã đăng ký môn này cũng sẽ bị hủy đăng ký.`)) {
+                    if (confirm(`Bạn có chắc muốn xóa môn học ${subId}?`)) {
                         subjects.value = subjects.value.filter(s => s.id !== subId);
                         Object.keys(registrations.value).forEach(stId => {
                             registrations.value[stId] = registrations.value[stId].filter(id => id !== subId);
@@ -1646,7 +1693,6 @@ function saveSubjects(subs) {
 
                 onMounted(() => {
                     loadDataFromSheetUrl(false);
-                    // Tự động làm tươi dữ liệu ngầm mỗi 30 giây để cập nhật thay đổi từ những người dùng khác
                     autoRefreshTimer = setInterval(() => {
                         if (!saving.value && !loading.value) {
                             loadDataFromSheetUrl(false);
